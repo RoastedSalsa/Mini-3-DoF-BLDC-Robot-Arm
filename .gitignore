@@ -1,0 +1,23 @@
+# PlatformIO build artifacts
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# VSCode
+.vscode/
+
+# MATLAB compiled/binary files
+*.mex*
+*.asv
+*.autosave
+
+# Simulink autosave and temporary files
+slprj/
+*.slxc
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude agent memory (local only)
+.claude/
