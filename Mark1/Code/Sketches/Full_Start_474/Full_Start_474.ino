@@ -1,21 +1,20 @@
-#include <Arduino.h>
 #include <Wire.h>
 #include <SimpleFOC.h>
 
 // === I2C / AS5600 ===
-TwoWire myWire1(PB7,  PA15);  // I2C1 HW — sensor 1 (SDA, SCL)
-TwoWire myWire2(PC9,  PC8);   // I2C3 HW — sensor 2 (SDA, SCL)
-TwoWire myWire3(PC7,  PC6);   // I2C4 HW — sensor 3 (SDA, SCL)
+TwoWire myWire1(PC7, PC6);               // SDA, SCL (your custom bus)
+TwoWire myWire2(PB9, PB8); 
+TwoWire myWire3(PC9, PC8);
 MagneticSensorI2C sensor1 = MagneticSensorI2C(AS5600_I2C);
 MagneticSensorI2C sensor2 = MagneticSensorI2C(AS5600_I2C);
 MagneticSensorI2C sensor3 = MagneticSensorI2C(AS5600_I2C);
-// === Motors / Drivers ===
-BLDCMotor motor1 = BLDCMotor(11);
+// === Motor / Driver (keep your original) ===
+BLDCMotor motor3 = BLDCMotor(7);         // 11 pole pairs for GM3506
 BLDCMotor motor2 = BLDCMotor(11);
-BLDCMotor motor3 = BLDCMotor(7);
-BLDCDriver3PWM driver1 = BLDCDriver3PWM(PA8, PA9,  PA10, PC5);   // TIM1
-BLDCDriver3PWM driver2 = BLDCDriver3PWM(PA0, PA1,  PB10, PB12);  // TIM2
-BLDCDriver3PWM driver3 = BLDCDriver3PWM(PA6, PB5,  PB0,  PB13);  // TIM3
+BLDCMotor motor1 = BLDCMotor(11);
+BLDCDriver3PWM driver1 = BLDCDriver3PWM(PB10, PB4, PB5, PA10);
+BLDCDriver3PWM driver2 = BLDCDriver3PWM(PA0, PA1, PB11, PB0);
+BLDCDriver3PWM driver3 = BLDCDriver3PWM(PC0, PC2, PC3, PC10);
 
 // === params ===
 float voltage_power_supply = 12.0; // battery / PSU voltage
@@ -46,9 +45,6 @@ float x = 0.2;
 float y = 0.0;
 float z = 0.2488;
 float r = 0.0;
-
-void trajectory();
-
 void setup() {
   Serial.begin(115200);
   while (!Serial && millis() < 2000);
@@ -70,7 +66,7 @@ void setup() {
   delay(50);
   Serial.println("Wire done");
   // init driver and motor (same order as before)
-
+  
   driver1.voltage_power_supply = voltage_power_supply;
   driver1.init();
   motor1.linkSensor(&sensor1);
@@ -88,7 +84,7 @@ void setup() {
   delay(50);
   motor1.initFOC();
   Serial.println("Motor 1 initialized");
-
+  
   driver2.voltage_power_supply = voltage_power_supply;
   driver2.init();
   motor2.linkSensor(&sensor2);
@@ -126,9 +122,11 @@ void setup() {
   motor3.initFOC(); // runs alignment using linked sensor
   // initialize FOC (this runs the alignment routine)
   Serial.println("Motor 3 initialized");
+  //Serial.println(motor3.sensor_direction);
+  //Serial.println(motor3.zero_electric_angle,6);
 
   //
-  // select angle
+  // select angle 
   motor1.controller = MotionControlType::angle;
   delay(50);
   motor2.controller = MotionControlType::angle;
@@ -146,8 +144,8 @@ void loop() {
   motor2.loopFOC();
   motor3.loopFOC();
   //Startup
-
-
+  
+  
   // --- Read desired position from Serial: "x y z"
   if (Serial.available()) {
       float nx, ny, nz;
@@ -225,6 +223,10 @@ void loop() {
     Serial.print("des_deg1: "); Serial.print(th1, 3);
     Serial.print("des_deg2: "); Serial.print(th2, 3);
     Serial.print("des_deg3: "); Serial.println(th3, 3);
+
+    
+    //Serial.print("\tvel: "); Serial.print(sensor.getVelocity(), 3);
+   // Serial.print("\tVlim: "); Serial.println(motor.voltage_limit, 2);
   }
 
   //command.run();
@@ -244,7 +246,7 @@ void trajectory() {
     static int i = 0;                    // current segment index [0..3]
     static unsigned long t0 = millis();  // start of segment
 
-    // --- compute interpolation alpha (0 -> 1) ---
+    // --- compute interpolation alpha (0 → 1) ---
     float dt = (millis() - t0) / 1000.0f;
     float a = dt / segmentTime;
 

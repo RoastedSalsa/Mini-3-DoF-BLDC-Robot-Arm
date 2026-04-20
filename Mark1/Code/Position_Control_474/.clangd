@@ -1,0 +1,24 @@
+CompileFlags:
+  Add:
+    - --target=arm-none-eabi
+    - -D__GNUC__=12
+    - -D__GNUC_MINOR__=3
+    - -D__GNUC_PATCHLEVEL__=1
+    - -isystem/home/roasted/.platformio/packages/toolchain-gccarmnoneeabi/arm-none-eabi/include/c++/12.3.1
+    - -isystem/home/roasted/.platformio/packages/toolchain-gccarmnoneeabi/arm-none-eabi/include/c++/12.3.1/arm-none-eabi
+    - -isystem/home/roasted/.platformio/packages/toolchain-gccarmnoneeabi/arm-none-eabi/include/c++/12.3.1/backward
+    - -isystem/home/roasted/.platformio/packages/toolchain-gccarmnoneeabi/lib/gcc/arm-none-eabi/12.3.1/include
+    - -isystem/home/roasted/.platformio/packages/toolchain-gccarmnoneeabi/lib/gcc/arm-none-eabi/12.3.1/include-fixed
+    - -isystem/home/roasted/.platformio/packages/toolchain-gccarmnoneeabi/arm-none-eabi/include
+    - "-I/home/roasted/Documents/Personal_Projects/Mini_Ranka/Mark1/Code/Position_Control_474/.pio/libdeps/nucleo_g474re/Simple FOC/src"
+  Remove:
+    - -mthumb
+    - -mcpu=*
+    - -mfpu=*
+    - -mfloat-abi=*
+    - --param*
+    - -fno-threadsafe-statics
+    - -fno-rtti
+    - -fno-exceptions
+    - -fno-use-cxa-atexit
+    - -nostdlib

@@ -1,42 +1,45 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-TwoWire myWire(PB9, PB8);  // use I2C1 on PB9 (SDA), PB8 (SCL)
-#define AS5600_ADDR 0x36   // 7-bit I2C address of AS5600
+#define AS5600_ADDR 0x36
 
-uint16_t readAS5600RawAngle();
+TwoWire myWire1(PB7,  PA15);  // I2C1 HW — sensor 1 (SDA, SCL)
+TwoWire myWire2(PC9,  PC8);   // I2C3 HW — sensor 2 (SDA, SCL) (Ground and 3.3V cables colours are mixed up >.<)
+TwoWire myWire3(PC7,  PC6);   // I2C4 HW — sensor 3 (SDA, SCL)
+
+uint16_t readAngle(TwoWire &wire) {
+    wire.beginTransmission(AS5600_ADDR);
+    wire.write(0x0C);  // RAW_ANGLE high byte
+    wire.endTransmission(false);
+    wire.requestFrom(AS5600_ADDR, (uint8_t)2);
+
+    if (wire.available() == 2) {
+        uint8_t high = wire.read();
+        uint8_t low  = wire.read();
+        return ((high & 0x0F) << 8) | low;
+    }
+    return 0xFFFF;
+}
 
 void setup() {
-  Serial.begin(115200);
-  myWire.begin();
-  delay(100);
+    Serial.begin(115200);
+    while (!Serial && millis() < 2000);
 
-  Serial.println("AS5600 test start");
+    myWire1.begin();
+    myWire2.begin();
+    myWire3.begin();
+
+    Serial.println("AS5600 3-sensor test");
 }
 
 void loop() {
-  uint16_t angle = readAS5600RawAngle();
-  float degrees = (angle * 360.0) / 4096.0;  // 12-bit resolution
+    uint16_t r1 = readAngle(myWire1);
+    uint16_t r2 = readAngle(myWire2);
+    uint16_t r3 = readAngle(myWire3);
 
-  Serial.print("Raw angle: ");
-  Serial.print(angle);
-  Serial.print("\tDegrees: ");
-  Serial.println(degrees, 2);
+    Serial.print("S1: "); Serial.print(r1 * 360.0f / 4096.0f, 2);
+    Serial.print("\tS2: "); Serial.print(r2 * 360.0f / 4096.0f, 2);
+    Serial.print("\tS3: "); Serial.println(r3 * 360.0f / 4096.0f, 2);
 
-  delay(2);
-}
-
-uint16_t readAS5600RawAngle() {
-  myWire.beginTransmission(AS5600_ADDR);
-  myWire.write(0x0C);  // RAW_ANGLE high byte register
-  myWire.endTransmission(false);
-  myWire.requestFrom(AS5600_ADDR, (uint8_t)2);
-
-  if (myWire.available() == 2) {
-    uint8_t high = myWire.read();
-    uint8_t low  = myWire.read();
-    return ((high & 0x0F) << 8) | low;
-  } else {
-    return 0xFFFF; // error value
-  }
+    delay(10);
 }
