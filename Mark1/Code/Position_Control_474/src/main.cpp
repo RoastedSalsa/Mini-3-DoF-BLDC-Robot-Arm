@@ -30,7 +30,7 @@ BLDCDriver3PWM driver2 = BLDCDriver3PWM(PA0, PA1,  PB10, PB12);  // TIM2
 BLDCDriver3PWM driver3 = BLDCDriver3PWM(PA6, PB5,  PB0,  PB13);  // PA6=TIM3_CH1, PB5=TIM3_CH2, PB6=TIM4_CH1 (PB0 unusable: only TIM1_CH2N / TIM3_CH3-via-ALT, both fail in SimpleFOC)
 
 // === Targets ===
-float target1 = 4, target2 = -1, target3 = 3.5;
+float target1 = 4.0f, target2 = -1.0f, target3 = 3.5f;
 
 Commander command = Commander(Serial);
 
@@ -71,17 +71,17 @@ void setup() {
 
     motor1.linkSensor(&sensor1);
     motor1.linkDriver(&driver1);
-    motor1.voltage_limit             = 12.0f;
-    motor1.PID_velocity.P            = 0.3f;
-    motor1.PID_velocity.I            = 0.1f;
-    motor1.PID_velocity.output_ramp  = 1000.0f;
-    motor1.P_angle.P                 = 10.0f;
-    motor1.P_angle.I                 = 1.0f;
-    motor1.P_angle.D                 = 0.05f;
-    motor1.velocity_limit            = 100.0f;
-    motor1.LPF_velocity.Tf           = 0.01f;
-    //motor1.zero_electric_angle     = 6.002470f;
-    //motor1.sensor_direction        = Direction::CW;
+    motor1.voltage_limit            = 12.0f;
+    motor1.PID_velocity.P           = 0.3f;
+    motor1.PID_velocity.I           = 0.1f;
+    motor1.PID_velocity.output_ramp = 1000.0f;
+    motor1.P_angle.P                = 10.0f;
+    motor1.P_angle.I                = 1.0f;
+    motor1.P_angle.D                = 0.05f;
+    motor1.velocity_limit           = 100.0f;
+    motor1.LPF_velocity.Tf          = 0.01f;
+    motor1.zero_electric_angle      = 1.2732f;
+    motor1.sensor_direction         = Direction::CW;
     motor1.init();
     motor1.initFOC();
     motor1.controller = MotionControlType::angle;
@@ -100,17 +100,17 @@ void setup() {
 
     motor2.linkSensor(&sensor2);
     motor2.linkDriver(&driver2);
-    motor2.voltage_limit             = 12.0f;
-    motor2.PID_velocity.P            = 0.3f;
-    motor2.PID_velocity.I            = 0.1f;
-    motor2.PID_velocity.output_ramp  = 1000.0f;
-    motor2.P_angle.P                 = 10.0f;
-    motor2.P_angle.I                 = 1.0f;
-    motor2.P_angle.D                 = 0.05f;
-    motor2.velocity_limit            = 100.0f;
-    motor2.LPF_velocity.Tf           = 0.01f;
-    //motor2.zero_electric_angle     = 3.529690f;
-    //motor2.sensor_direction        = Direction::CW;
+    motor2.voltage_limit            = 12.0f;
+    motor2.PID_velocity.P           = 0.3f;
+    motor2.PID_velocity.I           = 0.1f;
+    motor2.PID_velocity.output_ramp = 1000.0f;
+    motor2.P_angle.P                = 10.0f;
+    motor2.P_angle.I                = 1.0f;
+    motor2.P_angle.D                = 0.05f;
+    motor2.velocity_limit           = 100.0f;
+    motor2.LPF_velocity.Tf          = 0.01f;
+    motor2.zero_electric_angle      = 0.61210f;
+    motor2.sensor_direction         = Direction::CW;
     motor2.init();
     motor2.initFOC();
     motor2.controller = MotionControlType::angle;
@@ -130,14 +130,14 @@ void setup() {
 
     motor3.linkSensor(&sensor3);
     motor3.linkDriver(&driver3);
-    motor3.voltage_limit             = 12.0f;   // bring-up: lower current -> less PWM EMI on I2C4
-    motor3.PID_velocity.P            = 0.3f;
-    motor3.PID_velocity.output_ramp  = 1000.0f;
-    motor3.P_angle.P                 = 1.0f;
-    motor3.velocity_limit            = 100.0f;
-    motor3.LPF_velocity.Tf           = 0.05f;
-    //motor3.zero_electric_angle     = 3.5251f;
-    //motor3.sensor_direction        = Direction::CW;
+    motor3.voltage_limit            = 12.0f;   // bring-up: lower current -> less PWM EMI on I2C4
+    motor3.PID_velocity.P           = 0.3f;
+    motor3.PID_velocity.output_ramp = 1000.0f;
+    motor3.P_angle.P                = 1.0f;
+    motor3.velocity_limit           = 100.0f;
+    motor3.LPF_velocity.Tf          = 0.05f;
+    motor3.zero_electric_angle      = 2.2273f;
+    motor3.sensor_direction         = Direction::CW;
     motor3.init();
     motor3.initFOC();
     motor3.controller = MotionControlType::angle;
