@@ -2,7 +2,7 @@
 #include <SimpleFOC.h>
 
 // === Select motor: 1, 2, or 3 ===
-#define MOTOR_SELECT 1
+#define MOTOR_SELECT 3
 
 // === Motors ===
 BLDCMotor motor1 = BLDCMotor(11);
@@ -12,7 +12,7 @@ BLDCMotor motor3 = BLDCMotor(7);
 // === Drivers ===
 BLDCDriver3PWM driver1 = BLDCDriver3PWM(PA8, PA9,  PA10, PC5);   // TIM1
 BLDCDriver3PWM driver2 = BLDCDriver3PWM(PA0, PA1,  PB10, PB12);  // TIM2
-BLDCDriver3PWM driver3 = BLDCDriver3PWM(PA6, PB5,  PB0,  PB13);  // TIM3
+BLDCDriver3PWM driver3 = BLDCDriver3PWM(PA6, PB5,  PB0,  PB13);  // PA6=TIM3_CH1, PB5=TIM3_CH2, PB6=TIM4_CH1 (PB0 unusable: only TIM1_CH2N / TIM3_CH3-via-ALT, both fail in SimpleFOC)
 
 #if   MOTOR_SELECT == 1
   #define MOTOR  motor1
