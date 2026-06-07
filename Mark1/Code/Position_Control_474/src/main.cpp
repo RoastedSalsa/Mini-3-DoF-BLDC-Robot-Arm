@@ -132,10 +132,14 @@ void setup() {
     motor3.linkDriver(&driver3);
     motor3.voltage_limit            = 12.0f;   // bring-up: lower current -> less PWM EMI on I2C4
     motor3.PID_velocity.P           = 0.3f;
-    motor3.PID_velocity.output_ramp = 1000.0f;
-    motor3.P_angle.P                = 1.0f;
+    motor3.PID_velocity.I           = 0.1f;
+    //motor3.PID_velocity.D           = 0.0000f;
+    motor3.PID_velocity.output_ramp = 1000.0f;                                                      
+    motor3.P_angle.P                = 30.0f;
+    motor3.P_angle.I                = 5.0f;
+    motor3.P_angle.D                = 0.01f;
     motor3.velocity_limit           = 100.0f;
-    motor3.LPF_velocity.Tf          = 0.05f;
+    motor3.LPF_velocity.Tf          = 0.01f;
     motor3.zero_electric_angle      = 2.2273f;
     motor3.sensor_direction         = Direction::CW;
     motor3.init();
