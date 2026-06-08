@@ -3,6 +3,12 @@
 .pioenvs/
 .piolibdeps/
 
+# Archived/exported binaries (keep out of Git; large CAD/MATLAB bundles)
+*.zip
+
+# Tool run logs
+Mark1/tools/logs/
+
 # VSCode
 .vscode/
 
