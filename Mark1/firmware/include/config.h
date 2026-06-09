@@ -30,7 +30,7 @@ constexpr auto M2_EN   = PB12;
 
 constexpr auto M3_PH_A = PA6;   // driver3 — TIM3
 constexpr auto M3_PH_B = PB5;
-constexpr auto M3_PH_C = PB0;Adopted from the position-control
+constexpr auto M3_PH_C = PB0;
 // bring-up (diagnostics/position.cpp): the angle loop now carries integral +
 // derivative terms (previously P-only) and the velocity limit is raised to
 // match. Tune these live, without reflashing, using the 
