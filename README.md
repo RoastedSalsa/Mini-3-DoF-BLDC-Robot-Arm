@@ -75,7 +75,34 @@ A first version of the arm was built and is shown in the demo video. It has sinc
 ## Repository structure
 
 ```
-To DO!!!
+Mini_Ranka/
+├── docs/                     # Wiring, tuning guide, progress notes, decisions
+├── archive/                  # Original Arduino .ino sketches (pre-PlatformIO)
+└── Mark1/
+    ├── firmware/             # PlatformIO project (STM32 G474RE, SimpleFOC)
+    │   ├── include/
+    │   │   └── config.h      # All pins, gains, calibration, limits, waypoints
+    │   ├── lib/
+    │   │   ├── ArmKinematics/ # Analytical inverse kinematics
+    │   │   ├── Trajectory/    # Continuous Cartesian waypoint generator
+    │   │   └── Telemetry/     # Periodic CSV monitoring over serial
+    │   ├── src/
+    │   │   ├── full.cpp       # Main firmware: 3-joint FOC + IK + trajectory
+    │   │   ├── tools/
+    │   │   │   └── pid_tuner.cpp   # Live PID tuning + step-response over serial
+    │   │   └── diagnostics/   # Bring-up sketches (blink, as5600, openloop, …)
+    │   └── platformio.ini     # One build env per src target
+    ├── analysis/             # MATLAB dynamics + Simulink/Simscape models
+    ├── Simulations/          # Exported simulation archives
+    └── hardware/             # CAD
+```
+
+Each `src/` target has its own PlatformIO environment, e.g.:
+
+```bash
+pio run -e full -t upload          # main firmware
+pio run -e pid_tuner -t upload     # live PID tuning tool
+pio run -e position -t upload      # single/multi-joint position diagnostic
 ```
 
 ---
