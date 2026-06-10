@@ -13,7 +13,7 @@ BLDCMotor motor3 = BLDCMotor(M3_POLE_PAIRS);
 // === Drivers ===
 BLDCDriver3PWM driver1 = BLDCDriver3PWM(M1_PH_A, M1_PH_B,  M1_PH_C, M1_EN);   // TIM1
 BLDCDriver3PWM driver2 = BLDCDriver3PWM(M2_PH_A, M2_PH_B,  M2_PH_C, M2_EN);  // TIM2
-BLDCDriver3PWM driver3 = BLDCDriver3PWM(M3_PH_A, M3_PH_B,  M3_PH_C, M3_EN);  // PA6=TIM3_CH1, PB5=TIM3_CH2, PB6=TIM4_CH1 (PB0 unusable: only TIM1_CH2N / TIM3_CH3-via-ALT, both fail in SimpleFOC)
+BLDCDriver3PWM driver3 = BLDCDriver3PWM(M3_PH_A, M3_PH_B,  M3_PH_C, M3_EN);  // TIM3
 
 #if   MOTOR_SELECT == 1
   #define MOTOR  motor1
@@ -43,5 +43,6 @@ void setup() {
 }
 
 void loop() {
+    MOTOR.loopFOC(); //Loopfoc is needed in openloop from SimpleFOC v2.4.0
     MOTOR.move(1.0f); // rad/s — adjust as needed
 }

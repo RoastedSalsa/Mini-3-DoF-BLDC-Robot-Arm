@@ -37,7 +37,7 @@ constexpr auto M3_EN   = PB13;
 // NOTE: joint 3 differs from joints 1 & 2.
 constexpr int M1_POLE_PAIRS = 11; //G3506 Ipower
 constexpr int M2_POLE_PAIRS = 11; //G3506 Ipower  
-constexpr int M3_POLE_PAIRS = 7;    //GM2804 random Aliexpress
+constexpr int M3_POLE_PAIRS = 7;    //GBM2408 random Aliexpress
 
 // ================================ Power / limits =============================
 constexpr float SUPPLY_VOLTAGE = 12.0;   // battery / PSU voltage
