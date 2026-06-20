@@ -64,7 +64,9 @@ constexpr JointGains GAINS3{M3_VEL_P, M3_VEL_I, M3_OUTPUT_RAMP,
 // =============================== Run-time state ==============================
 float x = 0.2f, y = 0.0f, z = 0.2488f;   // active Cartesian target [m]
 float theta1 = 0, theta2 = 0, theta3 = 0; // IK joint angles [rad]
-float th1 = 0, th2 = 0, th3 = 0;          // motor-frame targets [rad]
+float th1 = 0, th2 = 0, th3 = 0;          // motor-frame targets (commanded) [rad]
+float meas1 = 0, meas2 = 0, meas3 = 0;    // measured sensor angles [rad]
+float err1 = 0, err2 = 0, err3 = 0;       // command - measured [rad]
 
 bool traj_enabled = true;    // trajectory running, or holding a manual target?
 
@@ -134,8 +136,26 @@ static void handleSerial() {
 
 // ================================= Arduino ===================================
 
+// Register every signal we want on the wire. Each is backed by a live variable,
+// so adding a plot is a single add() line here — the host ROS2 bridge and
+// PlotJuggler pick up new keys automatically (see docs/plotjuggler.md).
+static void registerTelemetry() {
+  telemetry.add("x", &x);          // Cartesian target [m]
+  telemetry.add("y", &y);
+  telemetry.add("z", &z);
+  telemetry.add("cmd1", &th1);     // commanded motor-frame angle [rad]
+  telemetry.add("meas1", &meas1);  // measured sensor angle [rad]
+  telemetry.add("err1", &err1);    // command - measured [rad]
+  telemetry.add("cmd2", &th2);
+  telemetry.add("meas2", &meas2);
+  telemetry.add("err2", &err2);
+  telemetry.add("cmd3", &th3);
+  telemetry.add("meas3", &meas3);
+  telemetry.add("err3", &err3);
+}
+
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(TELEMETRY_BAUD);
   while (!Serial && millis() < 2000);
   Serial.setTimeout(10);   // bound serial reads so they never stall the FOC loop
 
@@ -143,8 +163,8 @@ void setup() {
   configureJoint("Motor 2", myWire2, sensor2, driver2, motor2, GAINS2);
   configureJoint("Motor 3", myWire3, sensor3, driver3, motor3, GAINS3);
 
+  registerTelemetry();
   trajectory.begin(millis());
-  telemetry.begin();
   Serial.println(F("Arm ready."));
 }
 
@@ -178,7 +198,10 @@ void loop() {
   motor2.move(th2);
   motor3.move(th3);
 
-  // 5. Stream telemetry (CSV, throttled internally).
-  telemetry.update(now, x, y, z, th1, th2, th3,
-                   sensor1.getAngle(), sensor2.getAngle(), sensor3.getAngle());
+  // 5. Snapshot measured angles + tracking error, then stream telemetry
+  //    (JSON lines, throttled internally; see lib/Telemetry).
+  meas1 = sensor1.getAngle(); err1 = th1 - meas1;
+  meas2 = sensor2.getAngle(); err2 = th2 - meas2;
+  meas3 = sensor3.getAngle(); err3 = th3 - meas3;
+  telemetry.update(now);
 }

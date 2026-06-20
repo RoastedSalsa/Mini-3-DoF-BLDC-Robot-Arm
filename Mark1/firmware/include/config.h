@@ -64,12 +64,12 @@ constexpr float M2_VEL_LIMIT   = 100;
 constexpr float M2_LPF_TF      = 0.01;
 constexpr float M2_OUTPUT_RAMP = 1000;
 
-constexpr float M3_VEL_P       = 0.3;
-constexpr float M3_VEL_I       = 0.1;
-constexpr float M3_ANGLE_P     = 30;
-constexpr float M3_ANGLE_I     = 5.0;
-constexpr float M3_ANGLE_D     = 0.01;
-constexpr float M3_VEL_LIMIT   = 100;
+constexpr float M3_VEL_P       = 0.4;
+constexpr float M3_VEL_I       = 0.05;
+constexpr float M3_ANGLE_P     = 50;
+constexpr float M3_ANGLE_I     = 0;
+constexpr float M3_ANGLE_D     = 0.05;
+constexpr float M3_VEL_LIMIT   = 20;
 constexpr float M3_LPF_TF      = 0.01;
 constexpr float M3_OUTPUT_RAMP = 1000;
 
@@ -105,5 +105,10 @@ constexpr uint8_t TRAJ_COUNT           = 4;
 constexpr float   TRAJ_SEGMENT_TIME_S  = 2.0;   // seconds per segment
 
 // =============================== Telemetry ===================================
-// Periodic serial monitoring (see lib/Telemetry). One CSV sample per interval.
-constexpr unsigned long TELEMETRY_PERIOD_MS = 200;
+// Periodic serial telemetry for PlotJuggler (see lib/Telemetry + docs/plotjuggler.md).
+// One JSON line per interval is streamed over USB serial and bridged to ROS2.
+//
+// Baud is high so a full ~150-byte JSON line drains in ~1.6 ms and never stalls
+// the FOC loop. Keep the host ROS2 bridge (Mark1/ros2) at the SAME baud.
+constexpr unsigned long TELEMETRY_BAUD       = 921600;
+constexpr unsigned long TELEMETRY_PERIOD_MS  = 20;     // 50 Hz

@@ -5,10 +5,15 @@
 // interface so EVERY cascade gain can be adjusted over serial WHILE the motor
 // runs — no recompiling, no reflashing. A built-in square-wave step generator
 // lets you watch the step response continuously as you turn the knobs, and a
-// CSV stream feeds the Arduino Serial Plotter (or a logging script).
+// JSON telemetry stream (lib/Telemetry) feeds the ROS2 bridge -> PlotJuggler.
 //
 // Build:  pio run -e pid_tuner -t upload   (set TUNE_JOINT below first)
-// Serial: 115200 baud, newline line-endings.
+// Serial: 921600 baud (TELEMETRY_BAUD), newline line-endings.
+//
+// The commands below drive the SimpleFOC Commander over the serial port. With
+// the ROS2 bridge running (it owns the port), deliver them through it: publish
+// to /mini_ranka/cmd or use the `tune` console (ros2 run mini_ranka_bridge tune).
+// Commander text replies come back on /mini_ranka/log. See docs/plotjuggler.md.
 //
 // Commands
 //   M…            full SimpleFOC motor command — live gain access, e.g.
@@ -22,7 +27,7 @@
 //   P<sec>        set the step half-period [s]
 //   H             print this help
 //
-// CSV stream:  t_ms,target,measured,error      (~20 Hz)
+// Telemetry (JSON, lib/Telemetry):  {"t":..,"target":..,"meas":..,"err":..,"vel":..}
 //
 // See docs/tuning-guide.md for the recommended tuning procedure.
 
@@ -30,6 +35,7 @@
 #include <Wire.h>
 #include <SimpleFOC.h>
 #include "config.h"
+#include "Telemetry.h"
 
 // =============================================================================
 //  Select the joint to tune: 1, 2, or 3
@@ -87,19 +93,24 @@ MagneticSensorI2C sensor = MagneticSensorI2C(AS5600_I2C);
 BLDCMotor    motor  = BLDCMotor(J_POLES);
 BLDCDriver3PWM driver = BLDCDriver3PWM(J_PH_A, J_PH_B, J_PH_C, J_EN);
 Commander command = Commander(Serial);
+Telemetry telemetry(Serial, TELEMETRY_PERIOD_MS);   // JSON -> ROS2 bridge -> PlotJuggler
 
 // =============================================================================
 //  Targeting / step generator
 // =============================================================================
 float target = 0.5f * (J_MIN + J_MAX);          // commanded angle [rad]
 
+// Live signals streamed as JSON (registered in registerTelemetry()).
+float cmd_angle = target;                        // angle actually sent to move() [rad]
+float meas      = 0;                             // measured encoder angle [rad]
+float err       = 0;                             // cmd_angle - meas [rad]
+float vel       = 0;                             // measured shaft velocity [rad/s]
+
 bool          step_on   = false;                // continuous step active?
 float         step_lo   = 0, step_hi = 0;       // the two step levels [rad]
 float         step_half_period = 1.0f;          // seconds per level
 unsigned long step_t0   = 0;
 bool          step_high = false;
-
-const unsigned long MONITOR_PERIOD_MS = 50;     // ~20 Hz CSV stream
 
 void printHelp() {
   Serial.println(F("--- pid_tuner ---"));
@@ -110,7 +121,16 @@ void printHelp() {
   Serial.println(F("L<lo> <hi>: step levels [rad]"));
   Serial.println(F("P<s>: step half-period [s]"));
   Serial.println(F("H   : help"));
-  Serial.println(F("CSV : t_ms,target,measured,error"));
+  Serial.println(F("JSON: {t,target,meas,err,vel} -> ROS2 bridge -> PlotJuggler"));
+}
+
+// Register the signals streamed as JSON (lib/Telemetry). Each new key appears as
+// a /mini_ranka/<key> topic in ROS2 and a curve in PlotJuggler automatically.
+static void registerTelemetry() {
+  telemetry.add("target", &cmd_angle);   // commanded setpoint [rad]
+  telemetry.add("meas",   &meas);        // measured angle [rad]
+  telemetry.add("err",    &err);         // tracking error [rad]
+  telemetry.add("vel",    &vel);         // shaft velocity [rad/s]
 }
 
 // --- Commander callbacks ---------------------------------------------------
@@ -127,18 +147,22 @@ void doStepToggle(char* /*cmd*/) {
 }
 
 void doStepLevels(char* cmd) {
-  float lo, hi;
-  if (sscanf(cmd, "%f %f", &lo, &hi) == 2) {
-    step_lo = constrain(lo, J_MIN, J_MAX);
-    step_hi = constrain(hi, J_MIN, J_MAX);
-    Serial.print(F("step levels: ")); Serial.print(step_lo, 3);
-    Serial.print(F(" / ")); Serial.println(step_hi, 3);
-  }
+  // Parse two floats by hand. newlib-nano's sscanf(%f) is a silent no-op unless
+  // the build links -u _scanf_float, so use strtod (the same path atof uses).
+  char* end = nullptr;
+  float lo = strtod(cmd, &end);
+  if (end == cmd) { Serial.println(F("usage: L<lo> <hi>")); return; }
+  float hi = strtod(end, &end);
+  step_lo = constrain(lo, J_MIN, J_MAX);
+  step_hi = constrain(hi, J_MIN, J_MAX);
+  Serial.print(F("step levels: ")); Serial.print(step_lo, 3);
+  Serial.print(F(" / ")); Serial.println(step_hi, 3);
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(TELEMETRY_BAUD);
   while (!Serial && millis() < 2000);
+  Serial.setTimeout(10);   // bound serial reads so they never stall the FOC loop
 
   // default step around mid-range, ±0.3 rad, clamped to the joint limits
   float mid = 0.5f * (J_MIN + J_MAX);
@@ -177,6 +201,7 @@ void setup() {
   command.add('P', doPeriod,     "step half-period [s]");
   command.add('H', doHelp,       "help");
 
+  registerTelemetry();
   printHelp();
   Serial.println(F("ready"));
 }
@@ -194,18 +219,13 @@ void loop() {
     target = step_high ? step_hi : step_lo;
   }
 
-  motor.move(constrain(target, J_MIN, J_MAX));
+  cmd_angle = constrain(target, J_MIN, J_MAX);
+  motor.move(cmd_angle);
   command.run();
 
-  // CSV monitor for plotting: t_ms,target,measured,error
-  static unsigned long last = 0;
-  unsigned long now = millis();
-  if (now - last >= MONITOR_PERIOD_MS) {
-    last = now;
-    float meas = sensor.getAngle();
-    Serial.print(now);            Serial.print(',');
-    Serial.print(target, 4);      Serial.print(',');
-    Serial.print(meas, 4);        Serial.print(',');
-    Serial.println(target - meas, 4);
-  }
+  // JSON telemetry -> ROS2 bridge -> PlotJuggler (throttled inside lib/Telemetry).
+  meas = sensor.getAngle();
+  vel  = motor.shaft_velocity;
+  err  = cmd_angle - meas;
+  telemetry.update(millis());
 }

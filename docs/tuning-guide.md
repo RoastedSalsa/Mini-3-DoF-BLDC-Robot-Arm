@@ -34,16 +34,31 @@ into a hard-stop.
 
 ## 2. Live tuning with the `pid_tuner` tool
 
-`src/tools/pid_tuner.cpp` brings up **one** joint and exposes every gain over
-serial via the SimpleFOC Commander — adjust gains while the motor runs, no
-reflashing.
+`src/calibration/pid_tuner.cpp` brings up **one** joint and exposes every gain
+over serial via the SimpleFOC Commander — adjust gains while the motor runs, no
+reflashing. It streams the **same JSON telemetry contract as `full.cpp`**
+(`target`, `meas`, `err`, `vel`), so you watch the step response live in
+PlotJuggler through the ROS2 bridge and send gain commands back over ROS2.
 
 ```bash
-# 1. Pick the joint: edit `#define TUNE_JOINT 1|2|3` in src/tools/pid_tuner.cpp
-# 2. Flash and open the serial monitor
-pio run -e pid_tuner -t upload
-pio device monitor -b 115200
+# 1. Pick the joint: edit `#define TUNE_JOINT 1|2|3` in src/calibration/pid_tuner.cpp
+# 2. Flash it (streams JSON at 921600 = TELEMETRY_BAUD)
+cd Mark1/firmware && pio run -e pid_tuner -t upload
+
+# 3. Start the bridge (it owns the serial port) + an interactive command console
+cd Mark1/ros2 && colcon build && source install/setup.bash
+ros2 launch mini_ranka_bridge bridge.launch.py     # terminal A
+ros2 run   mini_ranka_bridge tune                  # terminal B  (type commands here)
+
+# 4. Plot: PlotJuggler -> Streaming -> ROS2 Topic Subscriber ->
+#    /mini_ranka/target, /mini_ranka/meas, /mini_ranka/err, /mini_ranka/vel
 ```
+
+> **One process owns the port.** The bridge holds `/dev/ttyACM0`, so don't also
+> open `pio device monitor` on it — that contention corrupts both streams. Send
+> commands through the `tune` console (or `ros2 topic pub --once /mini_ranka/cmd
+> std_msgs/msg/String "{data: 'MAP12'}"`); read Commander replies with
+> `ros2 topic echo /mini_ranka/log`.
 
 ### Serial commands
 
@@ -71,8 +86,9 @@ pio device monitor -b 115200
 2. **Then the angle loop.** Turn on the continuous step (`T`, with `L`/`P` set to
    a safe swing and period). Raise `MAP` for a fast rise; add a little `MAD` to
    damp overshoot; add `MAI` only if there's residual steady-state error.
-3. **Watch the CSV** (below) for overshoot, oscillation and settling time as you
-   turn each knob.
+3. **Watch PlotJuggler** (`/mini_ranka/target` vs `/mini_ranka/meas`, plus
+   `/err` and `/vel`) for overshoot, oscillation and settling time as you turn
+   each knob.
 4. **Copy the final values back into `config.h`** so `full.cpp` uses them.
 
 ---
@@ -81,31 +97,34 @@ pio device monitor -b 115200
 
 ### `pid_tuner` stream
 
-While tuning, the tool streams a CSV line at ~20 Hz, ideal for the Arduino
-**Serial Plotter** or a logging script:
+While tuning, the tool emits one JSON line per sample (every
+`TELEMETRY_PERIOD_MS`, default 20 ms) over serial — the same `lib/Telemetry`
+contract as `full.cpp`, so the existing ROS2 bridge plots it with no changes:
 
 ```
-t_ms,target,measured,error
+{"t":12873,"target":3.40,"meas":3.39,"err":0.01,"vel":0.02}
 ```
 
-### `full.cpp` telemetry
+- `target` is the commanded setpoint (post software-limit), `meas` the encoder
+  angle, `err = target - meas` the tracking error, `vel` the shaft velocity.
+- Plot in PlotJuggler via the bridge (`/mini_ranka/*`); log with
+  `ros2 bag record -a`. Setup: [docs/plotjuggler.md](plotjuggler.md).
+
+### `full.cpp` telemetry → PlotJuggler
 
 The main firmware uses [`lib/Telemetry`](../Mark1/firmware/lib/Telemetry) to emit
-one CSV sample every `TELEMETRY_PERIOD_MS` (default 200 ms):
+one JSON line every `TELEMETRY_PERIOD_MS` (default 20 ms) over serial:
 
 ```
-t_ms,x,y,z,cmd1,meas1,err1,cmd2,meas2,err2,cmd3,meas3,err3
+{"t":12873,"x":0.20,"y":0.0,"z":0.25,"cmd1":1.20,"meas1":1.18,"err1":0.02, ...}
 ```
 
 where `x,y,z` is the active Cartesian target, `cmd*` are the commanded joint
 angles (motor frame) and `meas*` the measured encoder angles. `err* = cmd-meas`
 is the live tracking error per joint — the quantity to minimize.
 
-To capture a run for offline analysis:
-
-```bash
-pio device monitor -b 115200 | tee run.csv
-```
+Plot it live in **PlotJuggler** via the ROS2 bridge, and capture runs with
+`ros2 bag record`. Full setup: [docs/plotjuggler.md](plotjuggler.md).
 
 ---
 

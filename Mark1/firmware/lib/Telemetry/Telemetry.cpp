@@ -3,29 +3,26 @@
 Telemetry::Telemetry(Stream& out, unsigned long period_ms)
   : out_(out), period_ms_(period_ms) {}
 
-void Telemetry::begin() {
-  out_.println(F("t_ms,x,y,z,cmd1,meas1,err1,cmd2,meas2,err2,cmd3,meas3,err3"));
+bool Telemetry::add(const char* name, const float* value) {
+  if (count_ >= MAX_CHANNELS) return false;
+  ch_[count_++] = {name, value};
+  return true;
 }
 
-void Telemetry::update(unsigned long now_ms,
-                       float x, float y, float z,
-                       float cmd1, float cmd2, float cmd3,
-                       float meas1, float meas2, float meas3) {
+void Telemetry::update(unsigned long now_ms) {
   if (!enabled_) return;
   if (now_ms - last_ms_ < period_ms_) return;
   last_ms_ = now_ms;
 
+  // One self-describing JSON object per line, e.g.
+  //   {"t":12873,"cmd1":1.2000,"meas1":1.1834}
+  out_.print(F("{\"t\":"));
   out_.print(now_ms);
-  out_.print(','); out_.print(x, 4);
-  out_.print(','); out_.print(y, 4);
-  out_.print(','); out_.print(z, 4);
-  out_.print(','); out_.print(cmd1, 3);
-  out_.print(','); out_.print(meas1, 3);
-  out_.print(','); out_.print(cmd1 - meas1, 3);
-  out_.print(','); out_.print(cmd2, 3);
-  out_.print(','); out_.print(meas2, 3);
-  out_.print(','); out_.print(cmd2 - meas2, 3);
-  out_.print(','); out_.print(cmd3, 3);
-  out_.print(','); out_.print(meas3, 3);
-  out_.print(','); out_.println(cmd3 - meas3, 3);
+  for (size_t i = 0; i < count_; ++i) {
+    out_.print(F(",\""));
+    out_.print(ch_[i].name);
+    out_.print(F("\":"));
+    out_.print(*ch_[i].value, decimals_);
+  }
+  out_.println('}');
 }

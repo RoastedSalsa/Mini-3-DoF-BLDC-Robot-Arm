@@ -1,0 +1,13 @@
+# Parameters for the Mini_Ranka telemetry bridge.
+# Override at launch:  ros2 launch mini_ranka_bridge bridge.launch.py port:=/dev/ttyACM1
+telemetry_bridge:
+  ros__parameters:
+    # Serial port of the Nucleo ST-Link VCP. Prefer a stable by-id path:
+    #   ls -l /dev/serial/by-id
+    port: "/dev/ttyACM0"
+    # Must match TELEMETRY_BAUD in Mark1/firmware/include/config.h.
+    baud: 921600
+    # Topics are published as /<namespace>/<signal>.
+    namespace: "mini_ranka"
+    # Seconds between reconnect attempts when the port is unavailable.
+    reconnect_period: 2.0
