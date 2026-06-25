@@ -1,4 +1,4 @@
-// full.cpp — main firmware for the Mini 3-DoF BLDC arm.
+// main.cpp — main firmware for the Mini 3-DoF BLDC arm.
 //
 // Closed-loop FOC angle control on all three joints, driven by an inverse-
 // kinematics + trajectory pipeline:
@@ -14,7 +14,23 @@
 //
 // All hardware pins, control gains, calibration, limits and trajectory waypoints
 // live in include/config.h. Tune the PID gains live with the `pid_tuner` tool
-// (src/tools/pid_tuner.cpp); see docs/tuning-guide.md.
+// (src/calibration/pid_tuner.cpp); see docs/tuning-guide.md.
+//
+// Operator input goes through the SimpleFOC Commander, exactly like pid_tuner,
+// so it is driven over the ROS2 bridge (publish to /mini_ranka/cmd, replies come
+// back on /mini_ranka/log) as well as a plain serial monitor. See the commands
+// below and docs/plotjuggler.md.
+//
+// Commands
+//   1… 2… 3…     full SimpleFOC motor command for joint 1/2/3 — live gain access:
+//                   1MG0       print joint-1 gains/limits
+//                   2VP0.3     joint-2 velocity PID P   2VI0.1  vel I
+//                   3AP12      joint-3 angle P          3AI1.0  angle I  3AD0.05 D
+//   T<x> <y> <z>  set a manual Cartesian target [m] (pauses the trajectory)
+//   G             resume the continuous trajectory
+//   H             print this help
+//
+// Telemetry (JSON, lib/Telemetry):  {"t",x,y,z,cmd1,meas1,err1, …}
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -43,6 +59,7 @@ BLDCDriver3PWM driver3 = BLDCDriver3PWM(M3_PH_A, M3_PH_B, M3_PH_C, M3_EN);  // T
 // ============================ Software modules ===============================
 Trajectory trajectory(TRAJ_PX, TRAJ_PY, TRAJ_PZ, TRAJ_COUNT, TRAJ_SEGMENT_TIME_S);
 Telemetry  telemetry(Serial, TELEMETRY_PERIOD_MS);
+Commander  command = Commander(Serial);   // operator input -> ROS2 bridge /cmd
 
 // ============================== Cascade gains ================================
 // Per-joint velocity + angle PID set
@@ -108,30 +125,42 @@ static void configureJoint(const char* name,
   Serial.println(F(" initialized"));
 }
 
-// Operator input over serial: three floats "x y z" set a manual Cartesian target
-// (and pause the trajectory); a leading 'g' resumes the continuous trajectory.
-static void handleSerial() {
-  if (!Serial.available()) return;
+void printHelp() {
+  Serial.println(F("--- mini_ranka ---"));
+  Serial.println(F("1.. 2.. 3.. : SimpleFOC motor cmd per joint (1MG0, 1VP, 1AP, ...)"));
+  Serial.println(F("T<x> <y> <z>: manual Cartesian target [m] (pauses trajectory)"));
+  Serial.println(F("G   : resume trajectory"));
+  Serial.println(F("H   : help"));
+  Serial.println(F("JSON: {t,x,y,z,cmdN,measN,errN} -> ROS2 bridge -> PlotJuggler"));
+}
 
-  char buf[48];
-  size_t n = Serial.readBytesUntil('\n', buf, sizeof(buf) - 1);
-  buf[n] = '\0';
+// --- Commander callbacks ---------------------------------------------------
+// Each joint exposes the full SimpleFOC motor command set for live gain access.
+void doMotor1(char* cmd) { command.motor(&motor1, cmd); }
+void doMotor2(char* cmd) { command.motor(&motor2, cmd); }
+void doMotor3(char* cmd) { command.motor(&motor3, cmd); }
+void doHelp(char* /*cmd*/) { printHelp(); }
 
-  if (buf[0] == 'g' || buf[0] == 'G') {
-    traj_enabled = true;
-    Serial.println(F("Trajectory resumed"));
-    return;
-  }
+void doResume(char* /*cmd*/) {
+  traj_enabled = true;
+  Serial.println(F("Trajectory resumed"));
+}
 
-  float nx, ny, nz;
-  if (sscanf(buf, "%f %f %f", &nx, &ny, &nz) == 3) {
-    x = nx; y = ny; z = nz;
-    traj_enabled = false;
-    Serial.print(F("Manual target (x,y,z): "));
-    Serial.print(x, 3); Serial.print(F(", "));
-    Serial.print(y, 3); Serial.print(F(", "));
-    Serial.println(z, 3);
-  }
+// Manual Cartesian target: "T<x> <y> <z>" [m], pauses the trajectory.
+void doTarget(char* cmd) {
+  // Parse three floats by hand. newlib-nano's sscanf(%f) is a silent no-op
+  // unless the build links -u _scanf_float, so use strtod (the atof path).
+  char* end = nullptr;
+  float nx = strtod(cmd, &end);
+  if (end == cmd) { Serial.println(F("usage: T<x> <y> <z>")); return; }
+  float ny = strtod(end, &end);
+  float nz = strtod(end, &end);
+  x = nx; y = ny; z = nz;
+  traj_enabled = false;
+  Serial.print(F("Manual target (x,y,z): "));
+  Serial.print(x, 3); Serial.print(F(", "));
+  Serial.print(y, 3); Serial.print(F(", "));
+  Serial.println(z, 3);
 }
 
 // ================================= Arduino ===================================
@@ -163,8 +192,16 @@ void setup() {
   configureJoint("Motor 2", myWire2, sensor2, driver2, motor2, GAINS2);
   configureJoint("Motor 3", myWire3, sensor3, driver3, motor3, GAINS3);
 
+  command.add('1', doMotor1, "joint 1 motor");
+  command.add('2', doMotor2, "joint 2 motor");
+  command.add('3', doMotor3, "joint 3 motor");
+  command.add('T', doTarget, "target x y z [m]");
+  command.add('G', doResume, "resume trajectory");
+  command.add('H', doHelp,   "help");
+
   registerTelemetry();
   trajectory.begin(millis());
+  printHelp();
   Serial.println(F("Arm ready."));
 }
 
@@ -177,8 +214,8 @@ void loop() {
   motor2.loopFOC();
   motor3.loopFOC();
 
-  // 2. Operator input, then advance the trajectory (unless a manual hold).
-  handleSerial();
+  // 2. Operator input (Commander), then advance the trajectory (unless a manual hold).
+  command.run();
   unsigned long now = millis();
   if (traj_enabled) trajectory.update(now, x, y, z);
 

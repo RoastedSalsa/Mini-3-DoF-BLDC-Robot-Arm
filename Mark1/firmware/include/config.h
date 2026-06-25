@@ -81,7 +81,7 @@ constexpr float M3_ZERO_ELEC_ANGLE = 2.2273;
 
 // ============================== Arm kinematics ===============================
 // Link lengths [m].
-constexpr float L1 = 0.0488;
+constexpr float L1 = 0.0843;
 constexpr float L2 = 0.2;
 constexpr float L3 = 0.2;
 

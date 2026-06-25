@@ -18,7 +18,7 @@ setup(
     install_requires=["setuptools", "pyserial"],
     zip_safe=True,
     maintainer="RoastedSalsa",
-    maintainer_email="augustasger@gmail.com",
+    maintainer_email="augustaspug@gmail.com",
     description="Serial-JSON to ROS2 telemetry bridge for the Mini_Ranka arm.",
     license="MIT",
     entry_points={
