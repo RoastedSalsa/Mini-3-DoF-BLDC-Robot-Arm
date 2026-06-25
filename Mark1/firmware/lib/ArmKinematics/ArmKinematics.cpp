@@ -8,10 +8,10 @@ bool ik(float x, float y, float z, float& t1, float& t2, float& t3) {
   t2 =  ( atan2(z - L1, r ) - atan2(L3*sin(t3), L2 + L3*cos(t3)));
   return true;
 }
-
 bool fk(float& x, float& y, float& z, float t1, float t2, float t3) {
-  x = cos(t1)*(l2*cos(t2)+l3*cos(t2+t3));
-  y = sin(t1)*(l2*cos(t2)+l3*cos(t2+t3));
-  z = l1 + (l2*sin(t2)+l3*sin(t2+t3));
+  float r = L2*cos(t2) + L3*cos(t2 + t3);
+  x = cos(t1) * r;
+  y = sin(t1) * r;
+  z = L1 + L2*sin(t2) + L3*sin(t2 + t3);
   return true;
 }
