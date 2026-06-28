@@ -3,7 +3,7 @@
 
 bool ik(float x, float y, float z, float& t1, float& t2, float& t3) {
   float r = sqrt(pow(x,2) + pow(y,2));
-  t1 =  atan2(y,x);
+  t1 =  atan2(y, x);
   t3 =  atan2(-sqrt(1-pow(((pow(r,2)+pow((z-L1),2) -pow(L2,2) - pow(L3,2))/ (2 * L2 * L3)),2) ), (pow(r,2) + pow((z-L1),2) -pow(L2,2) -pow(L3,2))/(2 * L2 * L3));
   t2 =  ( atan2(z - L1, r ) - atan2(L3*sin(t3), L2 + L3*cos(t3)));
   return true;

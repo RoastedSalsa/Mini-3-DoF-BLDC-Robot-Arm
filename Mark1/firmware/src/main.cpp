@@ -9,8 +9,6 @@
 //        --> motor.move()
 //        --> Telemetry (lib/Telemetry) streams cmd-vs-measured over serial
 //
-// NOTE: there is currently no joint homing — the IK joint angles are commanded
-// directly in the motor frame (no startup offset). A new homing scheme is TBD.
 //
 // All hardware pins, control gains, calibration, limits and trajectory waypoints
 // live in include/config.h. Tune the PID gains live with the `pid_tuner` tool
@@ -80,10 +78,16 @@ constexpr JointGains GAINS3{M3_VEL_P, M3_VEL_I, M3_OUTPUT_RAMP,
 
 // =============================== Run-time state ==============================
 float x = 0.2f, y = 0.0f, z = 0.2488f;   // active Cartesian target [m]
-float theta1 = 0, theta2 = 0, theta3 = 0; // IK joint angles [rad]
-float th1 = 0, th2 = 0, th3 = 0;          // motor-frame targets (commanded) [rad]
+float th1 = 0, th2 = 0, th3 = 0; // IK joint angles [rad]
+float theta1 = 0, theta2 = 0, theta3 = 0;          // motor-frame targets (commanded) [rad]
 float meas1 = 0, meas2 = 0, meas3 = 0;    // measured sensor angles [rad]
 float err1 = 0, err2 = 0, err3 = 0;       // command - measured [rad]
+float q1=0, q2=0,q3=0;
+float home_offset[3] = {HOME_OFFSET_1, HOME_OFFSET_2, HOME_OFFSET_3};
+bool  homed = false;            // status only — false = running on config defaults
+
+float meas_x = 0, meas_y = 0, meas_z = 0;   // measured end-effector pos (FK) [m]
+bool  cart_meas_enabled = false;            // toggle Cartesian measurement
 
 bool traj_enabled = true;    // trajectory running, or holding a manual target?
 
@@ -163,6 +167,31 @@ void doTarget(char* cmd) {
   Serial.println(z, 3);
 }
 
+void doCartToggle(char* /*cmd*/) {
+  cart_meas_enabled = !cart_meas_enabled;
+  if (!cart_meas_enabled) { meas_x = meas_y = meas_z = 0; }   // park at 0 when off
+  Serial.print(F("cartesian measurement: "));
+  Serial.println(cart_meas_enabled ? F("on") : F("off"));
+}
+
+// Home: arm is physically at the Cartesian home pose -> capture sensor offsets.
+void doHome(char* /*cmd*/) {
+  float hq1, hq2, hq3;
+  if (!ik(HOME_X, HOME_Y, HOME_Z, hq1, hq2, hq3)) {     // needs the reachability guard
+    Serial.println(F("home unreachable")); return;
+  }
+  home_offset[0] = sensor1.getAngle() + hq1;
+  home_offset[1] = sensor2.getAngle() - hq2 * JOINT_GEAR[1];   // J2 motor-side
+  home_offset[2] = sensor3.getAngle() - hq3;
+  homed = true;
+  Serial.print(F("homed offsets: "));
+  Serial.print(home_offset[0],4); Serial.print(' ');
+  Serial.print(home_offset[1],4); Serial.print(' ');
+  Serial.println(home_offset[2],4);
+  Serial.print(F("home_angle"));
+  Serial.print(hq1);
+  Serial.print(sensor1.getAngle());
+}
 // ================================= Arduino ===================================
 
 // Register every signal we want on the wire. Each is backed by a live variable,
@@ -181,6 +210,10 @@ static void registerTelemetry() {
   telemetry.add("cmd3", &th3);
   telemetry.add("meas3", &meas3);
   telemetry.add("err3", &err3);
+  telemetry.add("mx", &meas_x);   // measured end-effector X (FK of measured angles) [m]
+  telemetry.add("my", &meas_y);
+  telemetry.add("mz", &meas_z);
+  telemetry.add("q1", &q1);
 }
 
 void setup() {
@@ -197,7 +230,9 @@ void setup() {
   command.add('3', doMotor3, "joint 3 motor");
   command.add('T', doTarget, "target x y z [m]");
   command.add('G', doResume, "resume trajectory");
-  command.add('H', doHelp,   "help");
+  command.add('H', doHelp, "Help");
+  command.add('O', doHome, "at origin, add home offsets");
+  command.add('C', doCartToggle,"toggle cartesian measurement");
 
   registerTelemetry();
   trajectory.begin(millis());
@@ -219,17 +254,17 @@ void loop() {
   unsigned long now = millis();
   if (traj_enabled) trajectory.update(now, x, y, z);
 
-  // 3. Cartesian target -> joint angles -> motor frame (J2 gear ratio only;
-  //    no homing offset for now).
+  // 3. Cartesian target -> joint angles -> motor frame
   ik(x, y, z, theta1, theta2, theta3);
-  th1 = theta1;
-  th2 = theta2 * J2_GEAR_RATIO;
-  th3 = theta3;
+  th1 = JOINT_DIR[0] * JOINT_GEAR[0] * theta1 + home_offset[0];
+  th2 = JOINT_DIR[1] * JOINT_GEAR[1] * theta2 + home_offset[1];
+  th3 = JOINT_DIR[2] * JOINT_GEAR[2] * theta3 + home_offset[2];  
 
   // 4. Software travel limits before commanding (mechanical hard-stop guard).
   th1 = constrain(th1, J1_MIN, J1_MAX);
   th2 = constrain(th2, J2_MIN, J2_MAX);
   th3 = constrain(th3, J3_MIN, J3_MAX);
+
 
   motor1.move(th1);
   motor2.move(th2);
@@ -240,5 +275,12 @@ void loop() {
   meas1 = sensor1.getAngle(); err1 = th1 - meas1;
   meas2 = sensor2.getAngle(); err2 = th2 - meas2;
   meas3 = sensor3.getAngle(); err3 = th3 - meas3;
+
+  if (cart_meas_enabled) {
+    q1 =  JOINT_DIR[0] * meas1 + home_offset[0];
+    q2 = (meas2 - home_offset[1]) / JOINT_GEAR[1];   // J2 motor-side -> joint
+    q3 =  meas3 - home_offset[2];
+    fk(meas_x, meas_y, meas_z, q1, q2, q3);                // measured end-effector pos
+}
   telemetry.update(now);
 }

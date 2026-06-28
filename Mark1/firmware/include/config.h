@@ -85,15 +85,34 @@ constexpr float L1 = 0.0843;
 constexpr float L2 = 0.2;
 constexpr float L3 = 0.2;
 
-// Joint-2 gear ratio
-constexpr int J2_GEAR_RATIO = 3;
+// ========================= Per-joint frame mapping ===========================
+// Joint -> sensor/motor frame relationship. Fixed hardware facts:
+//   DIR  = encoder count direction vs the IK joint frame (+1 same, -1 opposite).
+//          J1 reads opposite the IK frame (atan2(y,x) is CCW; encoder counts CW).
+//   GEAR = motor-side reduction (J2 belt 3:1; J1/J3 direct).
+constexpr float JOINT_DIR[3]  = {-1.0f, 1.0f, 1.0f};
+constexpr float JOINT_GEAR[3] = { 1.0f, 3.0f, 1.0f};
+
 
 // ====================== Per-joint software travel limits =====================
 // Applied to the FINAL motor target (sensor frame, radians) before move(). 
 // Keeps IK / serial commands from driving a joint into a mechanical hard-stop.
-constexpr float J1_MIN = 2.0,  J1_MAX = 5.3;
-constexpr float J2_MIN = -4.0, J2_MAX = 1.5;
-constexpr float J3_MIN = 0.8,  J3_MAX = 6.0;
+constexpr float J1_MIN = -2.0,  J1_MAX = 2.0;
+constexpr float J2_MIN = -2.0, J2_MAX = 2.0;
+constexpr float J3_MIN = -2.0,  J3_MAX = 2.0;
+
+// ============================== Homing =======================================
+// Default sensor-frame offsets [rad], applied to the motor target. Used at
+// startup so the arm runs WITHOUT homing. home() ('O') captures fresh ones live
+// and prints them — paste the printed values back here to update the defaults.
+constexpr float HOME_OFFSET_1 = 0.0;   // 0 = kinematic zero already matches sensor
+constexpr float HOME_OFFSET_2 = 0.0;
+constexpr float HOME_OFFSET_3 = 0.0;
+
+// Cartesian home pose [m] — the physical reference home() captures against.
+constexpr float HOME_X = 0.050;
+constexpr float HOME_Y = 0.050;
+constexpr float HOME_Z = 0.03;
 
 // =============================== Trajectory ==================================
 // Continuous Cartesian waypoint loop (see lib/Trajectory). The arm cycles
