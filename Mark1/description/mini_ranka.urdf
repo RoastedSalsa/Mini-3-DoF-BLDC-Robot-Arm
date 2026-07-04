@@ -1,0 +1,108 @@
+<?xml version="1.0"?>
+<!--
+  mini_ranka.urdf — reference kinematic/dynamic model of the Mini 3-DoF BLDC arm.
+
+  Mirrors firmware/lib/ArmKinematics (ik/fk) and firmware/include/config.h:
+    L1 = 0.0843 m  (base column height, joint-1 axis -> joint-2 axis)
+    L2 = 0.2000 m  (upper arm, link 2)
+    L3 = 0.2000 m  (forearm, link 3)
+
+  Joint convention (matches the IK):
+    joint1 : base yaw about world +Z          -> gravity torque = 0
+    joint2 : shoulder pitch, from horizontal  (fk: z += L2*sin q2, r = L2*cos q2)
+    joint3 : elbow pitch, relative to link 2  (fk: z += L3*sin(q2+q3))
+  At q2 = q3 = 0 the arm points straight out along +X (horizontal).
+
+  NOTE — signs & inertials are PLACEHOLDERS for you to fill:
+   * Pitch joints use axis "0 1 0". Rotation about +Y lowers z, whereas the
+     firmware fk() raises z with +q2. If you drive this URDF from measured joint
+     angles, either flip to axis "0 -1 0" or negate q2/q3 — pick whichever makes
+     RViz match the hardware, then keep it consistent.
+   * <mass>, <origin> (COM) and <inertia> are rough/placeholder. Replace with your
+     CAD values; the same masses/COM feed the gravity model in GravityFF.cpp
+     (LINK2_MASS, LINK2_COM, LINK3_MASS, LINK3_COM in config.h).
+-->
+<robot name="mini_ranka">
+
+  <!-- ====================== Base ====================== -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0.04215" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.03" length="0.0843"/></geometry>
+    </visual>
+    <inertial>
+      <origin xyz="0 0 0.04215" rpy="0 0 0"/>
+      <mass value="0.5"/>
+      <inertia ixx="1e-3" iyy="1e-3" izz="1e-3" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- joint1: base yaw about vertical Z. No gravity torque. -->
+  <joint name="joint1" type="revolute">
+    <parent link="base_link"/>
+    <child  link="link2"/>
+    <origin xyz="0 0 0.0843" rpy="0 0 0"/>   <!-- top of the L1 column -->
+    <axis xyz="0 0 1"/>
+    <limit lower="-2.0" upper="2.0" effort="5.0" velocity="10.0"/>
+  </joint>
+
+  <!-- ====================== Link 2 (upper arm, L2) ====================== -->
+  <link name="link2">
+    <visual>
+      <origin xyz="0.1 0 0" rpy="0 1.5708 0"/>   <!-- centered along +X -->
+      <geometry><cylinder radius="0.015" length="0.2"/></geometry>
+    </visual>
+    <inertial>
+      <!-- COM at LINK2_COM from the joint-2 axis; edit to match config.h -->
+      <origin xyz="0.1 0 0" rpy="0 0 0"/>
+      <mass value="0.2"/>
+      <inertia ixx="1e-4" iyy="1e-3" izz="1e-3" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- joint2: shoulder pitch. -->
+  <joint name="joint2" type="revolute">
+    <parent link="link2"/>
+    <child  link="link3"/>
+    <origin xyz="0.2 0 0" rpy="0 0 0"/>   <!-- end of link 2 (L2) -->
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.0" upper="2.0" effort="5.0" velocity="10.0"/>
+  </joint>
+
+  <!-- ====================== Link 3 (forearm, L3) ====================== -->
+  <link name="link3">
+    <visual>
+      <origin xyz="0.1 0 0" rpy="0 1.5708 0"/>
+      <geometry><cylinder radius="0.012" length="0.2"/></geometry>
+    </visual>
+    <inertial>
+      <!-- COM at LINK3_COM from the joint-3 axis; edit to match config.h -->
+      <origin xyz="0.1 0 0" rpy="0 0 0"/>
+      <mass value="0.15"/>
+      <inertia ixx="1e-4" iyy="1e-3" izz="1e-3" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- joint3: elbow pitch (fixed axis parallel to joint2). -->
+  <joint name="joint3" type="revolute">
+    <parent link="link3"/>
+    <child  link="tool_link"/>
+    <origin xyz="0.2 0 0" rpy="0 0 0"/>   <!-- end of link 3 (L3) -->
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.0" upper="2.0" effort="5.0" velocity="10.0"/>
+  </joint>
+
+  <!-- ====================== End effector ====================== -->
+  <link name="tool_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.012"/></geometry>
+    </visual>
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <inertia ixx="1e-6" iyy="1e-6" izz="1e-6" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+</robot>

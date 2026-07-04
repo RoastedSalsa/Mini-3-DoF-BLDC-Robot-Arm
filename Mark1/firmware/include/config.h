@@ -105,14 +105,47 @@ constexpr float J3_MIN = -2.0,  J3_MAX = 2.0;
 // Default sensor-frame offsets [rad], applied to the motor target. Used at
 // startup so the arm runs WITHOUT homing. home() ('O') captures fresh ones live
 // and prints them — paste the printed values back here to update the defaults.
-constexpr float HOME_OFFSET_1 = 0.0;   // 0 = kinematic zero already matches sensor
-constexpr float HOME_OFFSET_2 = 0.0;
-constexpr float HOME_OFFSET_3 = 0.0;
+constexpr float HOME_OFFSET_1 = 3.7675;   // 0 = kinematic zero already matches sensor
+constexpr float HOME_OFFSET_2 = -6.7613;
+constexpr float HOME_OFFSET_3 = 3.4452;
 
 // Cartesian home pose [m] — the physical reference home() captures against.
 constexpr float HOME_X = 0.050;
 constexpr float HOME_Y = 0.050;
 constexpr float HOME_Z = 0.03;
+
+// ========================= Gravity feedforward (optional) ====================
+// Optional gravity compensation applied as a q-axis feedforward VOLTAGE on top
+// of the angle-control loop (voltage-mode torque control). See lib/GravityFF.
+// Fill in the dynamics in GravityFF.cpp and the parameters below, then enable.
+//
+// GRAVITY_FF_DEFAULT_ON is the runtime state at boot; live-toggle with the 'F'
+// Commander command.
+constexpr bool  GRAVITY_FF_DEFAULT_ON = false;
+constexpr float GRAV_G = 9.81f;                 // gravitational accel [m/s^2]
+
+// --- Link dynamic parameters (MEASURE / ESTIMATE these) ----------------------
+// Link 2 = upper arm (length L2); link 3 = forearm + any payload (length L3).
+constexpr float LINK2_MASS = 0.0f;   // mass of link 2 [kg]
+constexpr float LINK3_MASS = 0.0f;   // mass of link 3 (+ payload) [kg]
+constexpr float LINK2_COM  = 0.0f;   // COM dist. from joint-2 axis along L2 [m]
+constexpr float LINK3_COM  = 0.0f;   // COM dist. from joint-3 axis along L3 [m]
+
+// --- Torque -> voltage mapping (Vq = tau * R / Kt) ---------------------------
+// Per-joint motor torque constant Kt [N·m/A] and phase resistance R [ohm].
+// Set Kt <= 0 to disable feedforward on a joint (torque_to_voltage returns 0).
+constexpr float M1_TORQUE_CONSTANT  = 0.0f;
+constexpr float M2_TORQUE_CONSTANT  = 0.0f;
+constexpr float M3_TORQUE_CONSTANT  = 0.0f;
+constexpr float M1_PHASE_RESISTANCE = 0.0f;
+constexpr float M2_PHASE_RESISTANCE = 0.0f;
+constexpr float M3_PHASE_RESISTANCE = 0.0f;
+
+// Overall feedforward scale (0..1) for ramp-in / detuning while testing, and a
+// hard clamp [V] on the injected feedforward per motor (defense against a bad
+// model). The final voltage.q is still clamped to VOLTAGE_LIMIT afterwards.
+constexpr float GRAV_FF_GAIN          = 1.0f;
+constexpr float GRAV_FF_VOLTAGE_LIMIT = 3.0f;
 
 // =============================== Trajectory ==================================
 // Continuous Cartesian waypoint loop (see lib/Trajectory). The arm cycles

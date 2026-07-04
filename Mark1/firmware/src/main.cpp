@@ -37,6 +37,7 @@
 #include "ArmKinematics.h"
 #include "Trajectory.h"
 #include "Telemetry.h"
+#include "GravityFF.h"
 
 // ============================ Hardware objects ===============================
 // One AS5600 magnetic encoder per joint, each on its own hardware I2C bus.
@@ -91,6 +92,9 @@ bool  cart_meas_enabled = false;            // toggle Cartesian measurement
 
 bool traj_enabled = true;    // trajectory running, or holding a manual target?
 
+bool  gravity_ff_enabled = GRAVITY_FF_DEFAULT_ON;   // gravity feedforward on/off ('F')
+float ff1 = 0, ff2 = 0, ff3 = 0;                    // injected feedforward voltage [V] (telemetry)
+
 // ============================= Setup helpers =================================
 
 // Bring one joint fully online: I2C bus, encoder, driver, cascaded PID, FOC
@@ -134,6 +138,7 @@ void printHelp() {
   Serial.println(F("1.. 2.. 3.. : SimpleFOC motor cmd per joint (1MG0, 1VP, 1AP, ...)"));
   Serial.println(F("T<x> <y> <z>: manual Cartesian target [m] (pauses trajectory)"));
   Serial.println(F("G   : resume trajectory"));
+  Serial.println(F("F   : toggle gravity feedforward"));
   Serial.println(F("H   : help"));
   Serial.println(F("JSON: {t,x,y,z,cmdN,measN,errN} -> ROS2 bridge -> PlotJuggler"));
 }
@@ -192,6 +197,35 @@ void doHome(char* /*cmd*/) {
   Serial.print(hq1);
   Serial.print(sensor1.getAngle());
 }
+// Gravity feedforward toggle. Off by default; capped by GRAV_FF_VOLTAGE_LIMIT.
+void doGravityFF(char* /*cmd*/) {
+  gravity_ff_enabled = !gravity_ff_enabled;
+  Serial.print(F("gravity feedforward: "));
+  Serial.println(gravity_ff_enabled ? F("on") : F("off"));
+}
+
+// Inject the gravity-compensation feedforward voltage on each motor's q-axis,
+// ON TOP OF the angle-loop output already set by motor.move(). Called every loop
+// right after move(). q1..q3 are the IK JOINT-frame angles [rad].
+//
+// Per joint: joint torque -> motor torque (÷ gear) -> voltage (Kt/R) -> motor
+// frame (× JOINT_DIR) -> scaled (GRAV_FF_GAIN) -> clamped (GRAV_FF_VOLTAGE_LIMIT).
+// The final voltage.q is then re-clamped to VOLTAGE_LIMIT so we never exceed it.
+static void applyGravityFF(float q1, float q2, float q3) {
+  GravityTorques t = gravity_torques(q1, q2, q3);
+  const float tau[3] = { t.tau1, t.tau2, t.tau3 };
+  BLDCMotor* motors[3] = { &motor1, &motor2, &motor3 };
+  float* ff[3] = { &ff1, &ff2, &ff3 };
+
+  for (uint8_t i = 0; i < 3; ++i) {
+    float v = JOINT_DIR[i] * torque_to_voltage(i, tau[i] / JOINT_GEAR[i]) * GRAV_FF_GAIN;
+    v = constrain(v, -GRAV_FF_VOLTAGE_LIMIT, GRAV_FF_VOLTAGE_LIMIT);
+    *ff[i] = v;
+    float vq = constrain(motors[i]->voltage.q + v, -VOLTAGE_LIMIT, VOLTAGE_LIMIT);
+    motors[i]->voltage.q = vq;
+  }
+}
+
 // ================================= Arduino ===================================
 
 // Register every signal we want on the wire. Each is backed by a live variable,
@@ -213,7 +247,9 @@ static void registerTelemetry() {
   telemetry.add("mx", &meas_x);   // measured end-effector X (FK of measured angles) [m]
   telemetry.add("my", &meas_y);
   telemetry.add("mz", &meas_z);
-  telemetry.add("q1", &q1);
+  telemetry.add("ff1", &ff1);     // injected gravity feedforward voltage [V]
+  telemetry.add("ff2", &ff2);
+  telemetry.add("ff3", &ff3);
 }
 
 void setup() {
@@ -233,6 +269,7 @@ void setup() {
   command.add('H', doHelp, "Help");
   command.add('O', doHome, "at origin, add home offsets");
   command.add('C', doCartToggle,"toggle cartesian measurement");
+  command.add('F', doGravityFF, "toggle gravity feedforward");
 
   registerTelemetry();
   trajectory.begin(millis());
@@ -254,21 +291,27 @@ void loop() {
   unsigned long now = millis();
   if (traj_enabled) trajectory.update(now, x, y, z);
 
-  // 3. Cartesian target -> joint angles -> motor frame
+  // 3. Software travel limit:
+
+  theta1 = constrain(theta1, J1_MIN, J1_MAX);
+  theta2 = constrain(theta2, J2_MIN, J2_MAX);
+  theta3 = constrain(theta3, J3_MIN, J3_MAX);
+
+  // 4. Cartesian target -> joint angles -> motor frame
   ik(x, y, z, theta1, theta2, theta3);
   th1 = JOINT_DIR[0] * JOINT_GEAR[0] * theta1 + home_offset[0];
   th2 = JOINT_DIR[1] * JOINT_GEAR[1] * theta2 + home_offset[1];
   th3 = JOINT_DIR[2] * JOINT_GEAR[2] * theta3 + home_offset[2];  
 
-  // 4. Software travel limits before commanding (mechanical hard-stop guard).
-  th1 = constrain(th1, J1_MIN, J1_MAX);
-  th2 = constrain(th2, J2_MIN, J2_MAX);
-  th3 = constrain(th3, J3_MIN, J3_MAX);
-
 
   motor1.move(th1);
   motor2.move(th2);
   motor3.move(th3);
+
+  // Add gravity-compensation voltage on top of the angle-loop output. Uses the
+  // IK JOINT-frame angles (theta1..3). Applied here so the next loopFOC() drives
+  // the combined voltage.q. No-op until GravityFF.cpp physics are filled in.
+  if (gravity_ff_enabled) applyGravityFF(theta1, theta2, theta3);
 
   // 5. Snapshot measured angles + tracking error, then stream telemetry
   //    (JSON lines, throttled internally; see lib/Telemetry).
