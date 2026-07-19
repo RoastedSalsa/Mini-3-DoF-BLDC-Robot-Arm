@@ -11,3 +11,14 @@ telemetry_bridge:
     namespace: "mini_ranka"
     # Seconds between reconnect attempts when the port is unavailable.
     reconnect_period: 2.0
+    # SimpleFOC Commander lines sent after every (re)connect. Handy for selecting
+    # which dynamics-feedforward terms run without reflashing (see lib/Dynamics):
+    #   DN = all terms off   DG = gravity   DI = inertia
+    #   DA = all terms on    DC = centrifugal   DK = Coriolis
+    #   F  = master feedforward on/off
+    # e.g. gravity + inertia only, feedforward enabled:
+    #   startup_commands: ["DN", "DG", "DI", "F"]
+    startup_commands: []
+    # Seconds to wait after opening the port before sending them; the firmware
+    # ignores anything that arrives while it is still in setup().
+    startup_delay: 2.0

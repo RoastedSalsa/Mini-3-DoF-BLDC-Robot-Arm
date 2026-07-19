@@ -44,6 +44,16 @@ class TelemetryBridge(Node):
         self.reconnect_period = float(
             self.declare_parameter("reconnect_period", 2.0).value
         )
+        # Commander lines sent once the port is open, e.g. to pick which dynamics
+        # feedforward terms are active without reflashing:  ["DN", "DG", "F"].
+        # Replayed on every reconnect, since the board usually resets when the
+        # port is reopened and would otherwise fall back to its config.h defaults.
+        self.startup_commands = [
+            str(c) for c in self.declare_parameter("startup_commands", []).value or []
+        ]
+        # Seconds to wait after opening before sending them — the STM32 VCP drops
+        # anything written while the firmware is still in setup().
+        self.startup_delay = float(self.declare_parameter("startup_delay", 2.0).value)
 
         self._pubs: dict[str, "rclpy.publisher.Publisher"] = {}
         self._serial: "serial.Serial | None" = None
@@ -92,19 +102,35 @@ class TelemetryBridge(Node):
                 continue
             self._publisher_for(str(key)).publish(Float64(data=float(val)))
 
-    def _on_cmd(self, msg: "String") -> None:
-        """Forward one command line from ROS2 to the firmware over serial."""
+    def _write_line(self, text: str) -> bool:
+        """Write one newline-terminated Commander line to the firmware."""
         ser = self._serial
         if ser is None or not ser.is_open:
-            self.get_logger().warning(f"cmd dropped (port not open): {msg.data!r}")
-            return
-        line = (msg.data.rstrip("\r\n") + "\n").encode("utf-8")
+            self.get_logger().warning(f"cmd dropped (port not open): {text!r}")
+            return False
         try:
             with self._write_lock:
-                ser.write(line)
-            self.get_logger().info(f"cmd -> {msg.data!r}")
+                ser.write((text.rstrip("\r\n") + "\n").encode("utf-8"))
         except (serial.SerialException, OSError) as exc:
             self.get_logger().warning(f"cmd write failed: {exc}")
+            return False
+        self.get_logger().info(f"cmd -> {text!r}")
+        return True
+
+    def _on_cmd(self, msg: "String") -> None:
+        """Forward one command line from ROS2 to the firmware over serial."""
+        self._write_line(msg.data)
+
+    def _send_startup_commands(self) -> None:
+        """Replay the configured Commander lines after a (re)connect."""
+        if not self.startup_commands:
+            return
+        if self._stop.wait(self.startup_delay):   # bail out if shutting down
+            return
+        for cmd in self.startup_commands:
+            if not self._write_line(cmd):
+                return
+            self._stop.wait(0.05)   # let the firmware consume each line
 
     def _run(self) -> None:
         """Reader loop: (re)open the port and pump lines until shutdown."""
@@ -112,6 +138,11 @@ class TelemetryBridge(Node):
             try:
                 self._serial = serial.Serial(self.port, self.baud, timeout=1.0)
                 self.get_logger().info(f"opened {self.port}")
+                # Off-thread so the reader starts pumping immediately instead of
+                # blocking for startup_delay while the board boots.
+                threading.Thread(
+                    target=self._send_startup_commands, daemon=True
+                ).start()
             except serial.SerialException as exc:
                 self.get_logger().warning(
                     f"cannot open {self.port}: {exc}; retrying in "

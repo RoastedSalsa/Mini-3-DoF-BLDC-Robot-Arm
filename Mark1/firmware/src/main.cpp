@@ -26,6 +26,8 @@
 //                   3AP12      joint-3 angle P          3AI1.0  angle I  3AD0.05 D
 //   T<x> <y> <z>  set a manual Cartesian target [m] (pauses the trajectory)
 //   G             resume the continuous trajectory
+//   F             master on/off for the dynamics feedforward
+//   D             print / select which dynamics terms are active (DG DI DC DK DA DN)
 //   H             print this help
 //
 // Telemetry (JSON, lib/Telemetry):  {"t",x,y,z,cmd1,meas1,err1, …}
@@ -37,7 +39,7 @@
 #include "ArmKinematics.h"
 #include "Trajectory.h"
 #include "Telemetry.h"
-#include "GravityFF.h"
+#include "Dynamics.h"
 
 // ============================ Hardware objects ===============================
 // One AS5600 magnetic encoder per joint, each on its own hardware I2C bus.
@@ -92,8 +94,20 @@ bool  cart_meas_enabled = false;            // toggle Cartesian measurement
 
 bool traj_enabled = true;    // trajectory running, or holding a manual target?
 
-bool  gravity_ff_enabled = GRAVITY_FF_DEFAULT_ON;   // gravity feedforward on/off ('F')
-float ff1 = 0, ff2 = 0, ff3 = 0;                    // injected feedforward voltage [V] (telemetry)
+bool    dyn_ff_enabled = DYN_FF_DEFAULT_ON;   // dynamics feedforward master on/off ('F')
+uint8_t dyn_terms      = 0;                   // which model terms are active ('D'), set in setup()
+float   ff1 = 0, ff2 = 0, ff3 = 0;            // injected feedforward voltage [V] (telemetry)
+
+// Joint-space setpoints and their derivatives, IK joint frame. qd/qdd are obtained
+// by differentiating the position setpoint (the trajectory only produces position),
+// each passed through a first-order low-pass so a LINEAR-eased segment boundary
+// does not turn into an acceleration spike. Desired rates are used rather than
+// measured ones so the feedforward stays open-loop and cannot inject sensor noise
+// back into the drive.
+float q_des[3]   = {0, 0, 0};
+float qd_des[3]  = {0, 0, 0};
+float qdd_des[3] = {0, 0, 0};
+unsigned long dyn_last_us = 0;   // 0 = no previous sample yet
 
 // ============================= Setup helpers =================================
 
@@ -138,7 +152,8 @@ void printHelp() {
   Serial.println(F("1.. 2.. 3.. : SimpleFOC motor cmd per joint (1MG0, 1VP, 1AP, ...)"));
   Serial.println(F("T<x> <y> <z>: manual Cartesian target [m] (pauses trajectory)"));
   Serial.println(F("G   : resume trajectory"));
-  Serial.println(F("F   : toggle gravity feedforward"));
+  Serial.println(F("F   : toggle dynamics feedforward (master)"));
+  Serial.println(F("D   : dynamics terms - DG grav, DI inertia, DC centrif, DK coriolis, DA all, DN none"));
   Serial.println(F("H   : help"));
   Serial.println(F("JSON: {t,x,y,z,cmdN,measN,errN} -> ROS2 bridge -> PlotJuggler"));
 }
@@ -197,29 +212,110 @@ void doHome(char* /*cmd*/) {
   Serial.print(hq1);
   Serial.print(sensor1.getAngle());
 }
-// Gravity feedforward toggle. Off by default; capped by GRAV_FF_VOLTAGE_LIMIT.
-void doGravityFF(char* /*cmd*/) {
-  gravity_ff_enabled = !gravity_ff_enabled;
-  Serial.print(F("gravity feedforward: "));
-  Serial.println(gravity_ff_enabled ? F("on") : F("off"));
+// Dynamics feedforward master switch. Off by default; capped by DYN_FF_VOLTAGE_LIMIT.
+void doDynFF(char* /*cmd*/) {
+  dyn_ff_enabled = !dyn_ff_enabled;
+  Serial.print(F("dynamics feedforward: "));
+  Serial.println(dyn_ff_enabled ? F("on") : F("off"));
 }
 
-// Inject the gravity-compensation feedforward voltage on each motor's q-axis,
-// ON TOP OF the angle-loop output already set by motor.move(). Called every loop
-// right after move(). q1..q3 are the IK JOINT-frame angles [rad].
+// Report which model terms are currently active.
+static void printDynTerms() {
+  Serial.print(F("dynamics terms:"));
+  const uint8_t bits[4] = {DYN_GRAVITY, DYN_INERTIA, DYN_CENTRIFUGAL, DYN_CORIOLIS};
+  for (uint8_t i = 0; i < 4; ++i) {
+    Serial.print(' ');
+    Serial.print(dynamics_term_name(bits[i]));
+    Serial.print((dyn_terms & bits[i]) ? F("=on") : F("=off"));
+  }
+  Serial.println();
+}
+
+// Select which terms of tau = M(q)qdd + C(q,qd)qd + G(q) are evaluated. Each
+// letter toggles one term, so you can bring the model up a piece at a time and
+// watch ff1..ff3 in PlotJuggler to see what each one contributes.
+//
+//   D    print the current selection      DG  gravity        DI  inertia
+//   DA   all terms on                     DC  centrifugal    DK  Coriolis
+//   DN   all terms off
+//
+// Works identically over the ROS2 bridge, which forwards String messages
+// verbatim to the Commander:
+//   ros2 topic pub --once /mini_ranka/cmd std_msgs/String "data: 'DI'"
+void doDynTerms(char* cmd) {
+  // Commander hands us everything after the 'D'; skip leading blanks.
+  while (*cmd == ' ') ++cmd;
+  switch (toupper(*cmd)) {
+    case '\0': break;                              // bare 'D' -> just report
+    case 'A': dyn_terms = DYN_ALL;  break;
+    case 'N': dyn_terms = DYN_NONE; break;
+    case 'G': dyn_terms ^= DYN_GRAVITY;     break;
+    case 'I': dyn_terms ^= DYN_INERTIA;     break;
+    case 'C': dyn_terms ^= DYN_CENTRIFUGAL; break;
+    case 'K': dyn_terms ^= DYN_CORIOLIS;    break;
+    default:
+      Serial.println(F("usage: D | DG | DI | DC | DK | DA | DN"));
+      return;
+  }
+  printDynTerms();
+}
+
+// Differentiate the joint setpoint to get qd and qdd for the velocity- and
+// acceleration-dependent model terms. Called once per loop with the current IK
+// joint angles; dt comes from micros() because the loop rate is not fixed.
+//
+// Both derivatives are low-pass filtered (DYN_VEL_LPF_TF / DYN_ACCEL_LPF_TF).
+// The first sample after boot only seeds the state — differentiating against an
+// undefined previous value would produce one enormous bogus acceleration.
+static void updateSetpointDerivatives(float t1, float t2, float t3, unsigned long now_us) {
+  const float target[3] = {t1, t2, t3};
+
+  if (dyn_last_us == 0) {                       // first call: seed, no derivative
+    for (uint8_t i = 0; i < 3; ++i) q_des[i] = target[i];
+    dyn_last_us = now_us;
+    return;
+  }
+
+  const float dt = (now_us - dyn_last_us) * 1e-6f;   // unsigned wrap is well-defined
+  dyn_last_us = now_us;
+  if (dt <= 0.0f || dt > 0.1f) {
+    // Loop stalled (or micros() wrapped oddly). The arm may have moved a long way
+    // since the last sample, so the stored rates are meaningless — drop them to
+    // zero rather than feed a stale acceleration into the drive, and resync.
+    for (uint8_t i = 0; i < 3; ++i) { q_des[i] = target[i]; qd_des[i] = 0; qdd_des[i] = 0; }
+    return;
+  }
+
+  // First-order LPF blend factors: alpha = dt / (Tf + dt).
+  const float a_vel = dt / (DYN_VEL_LPF_TF   + dt);
+  const float a_acc = dt / (DYN_ACCEL_LPF_TF + dt);
+
+  for (uint8_t i = 0; i < 3; ++i) {
+    const float vel_raw = (target[i] - q_des[i]) / dt;
+    const float vel_new = qd_des[i] + a_vel * (vel_raw - qd_des[i]);
+    const float acc_raw = (vel_new - qd_des[i]) / dt;
+    qdd_des[i] = qdd_des[i] + a_acc * (acc_raw - qdd_des[i]);
+    qd_des[i]  = vel_new;
+    q_des[i]   = target[i];
+  }
+}
+
+// Inject the model feedforward voltage on each motor's q-axis, ON TOP OF the
+// angle-loop output already set by motor.move(). Called every loop right after
+// move(), using the IK JOINT-frame setpoint and its derivatives.
 //
 // Per joint: joint torque -> motor torque (÷ gear) -> voltage (Kt/R) -> motor
-// frame (× JOINT_DIR) -> scaled (GRAV_FF_GAIN) -> clamped (GRAV_FF_VOLTAGE_LIMIT).
+// frame (× JOINT_DIR) -> scaled (DYN_FF_GAIN) -> clamped (DYN_FF_VOLTAGE_LIMIT).
 // The final voltage.q is then re-clamped to VOLTAGE_LIMIT so we never exceed it.
-static void applyGravityFF(float q1, float q2, float q3) {
-  GravityTorques t = gravity_torques(q1, q2, q3);
+static void applyDynamicsFF() {
+  JointTorques t = joint_torques(q_des, qd_des, qdd_des, dyn_terms);
   const float tau[3] = { t.tau1, t.tau2, t.tau3 };
   BLDCMotor* motors[3] = { &motor1, &motor2, &motor3 };
   float* ff[3] = { &ff1, &ff2, &ff3 };
 
   for (uint8_t i = 0; i < 3; ++i) {
-    float v = JOINT_DIR[i] * torque_to_voltage(i, tau[i] / JOINT_GEAR[i]) * GRAV_FF_GAIN;
-    v = constrain(v, -GRAV_FF_VOLTAGE_LIMIT, GRAV_FF_VOLTAGE_LIMIT);
+    float v = JOINT_DIR[i] * torque_to_voltage(i, tau[i] / JOINT_GEAR[i]) * DYN_FF_GAIN;
+    v = constrain(v, -DYN_FF_VOLTAGE_LIMIT, DYN_FF_VOLTAGE_LIMIT);
     *ff[i] = v;
     float vq = constrain(motors[i]->voltage.q + v, -VOLTAGE_LIMIT, VOLTAGE_LIMIT);
     motors[i]->voltage.q = vq;
@@ -269,11 +365,15 @@ void setup() {
   command.add('H', doHelp, "Help");
   command.add('O', doHome, "at origin, add home offsets");
   command.add('C', doCartToggle,"toggle cartesian measurement");
-  command.add('F', doGravityFF, "toggle gravity feedforward");
+  command.add('F', doDynFF,     "toggle dynamics feedforward");
+  command.add('D', doDynTerms,  "select dynamics terms");
+
+  dyn_terms = dynamics_default_terms();   // DYN_ENABLE_* from config.h
 
   registerTelemetry();
   trajectory.begin(millis());
   printHelp();
+  printDynTerms();
   Serial.println(F("Arm ready."));
 }
 
@@ -291,38 +391,45 @@ void loop() {
   unsigned long now = millis();
   if (traj_enabled) trajectory.update(now, x, y, z);
 
-  // 3. Software travel limit:
+
+  // 3. Cartesian target -> joint angles -> motor frame
+
+  ik(x, y, z, theta1, theta2, theta3);
 
   theta1 = constrain(theta1, J1_MIN, J1_MAX);
   theta2 = constrain(theta2, J2_MIN, J2_MAX);
   theta3 = constrain(theta3, J3_MIN, J3_MAX);
 
-  // 4. Cartesian target -> joint angles -> motor frame
-  ik(x, y, z, theta1, theta2, theta3);
   th1 = JOINT_DIR[0] * JOINT_GEAR[0] * theta1 + home_offset[0];
   th2 = JOINT_DIR[1] * JOINT_GEAR[1] * theta2 + home_offset[1];
   th3 = JOINT_DIR[2] * JOINT_GEAR[2] * theta3 + home_offset[2];  
 
 
+  // Track the joint setpoint and its derivatives every loop, whether or not the
+  // feedforward is active — so toggling 'F' on mid-motion starts from a settled
+  // qd/qdd rather than a startup transient.
+  updateSetpointDerivatives(theta1, theta2, theta3, micros());
+
   motor1.move(th1);
   motor2.move(th2);
   motor3.move(th3);
 
-  // Add gravity-compensation voltage on top of the angle-loop output. Uses the
-  // IK JOINT-frame angles (theta1..3). Applied here so the next loopFOC() drives
-  // the combined voltage.q. No-op until GravityFF.cpp physics are filled in.
-  if (gravity_ff_enabled) applyGravityFF(theta1, theta2, theta3);
+  // Add the model feedforward voltage on top of the angle-loop output, so the
+  // next loopFOC() drives the combined voltage.q. Still a no-op until the
+  // M*_TORQUE_CONSTANT / M*_PHASE_RESISTANCE values in config.h are filled in.
+  if (dyn_ff_enabled) applyDynamicsFF();
+  else                ff1 = ff2 = ff3 = 0;   // don't leave stale values on the wire
 
-  // 5. Snapshot measured angles + tracking error, then stream telemetry
+  // 4. Snapshot measured angles + tracking error, then stream telemetry
   //    (JSON lines, throttled internally; see lib/Telemetry).
   meas1 = sensor1.getAngle(); err1 = th1 - meas1;
   meas2 = sensor2.getAngle(); err2 = th2 - meas2;
   meas3 = sensor3.getAngle(); err3 = th3 - meas3;
 
   if (cart_meas_enabled) {
-    q1 =  JOINT_DIR[0] * meas1 + home_offset[0];
-    q2 = (meas2 - home_offset[1]) / JOINT_GEAR[1];   // J2 motor-side -> joint
-    q3 =  meas3 - home_offset[2];
+    q1 = JOINT_DIR[0] * (meas1 - home_offset[0]) / JOINT_GEAR[0];
+    q2 = JOINT_DIR[1] * (meas2 - home_offset[1]) / JOINT_GEAR[1];   // J2 motor-side -> joint
+    q3 = JOINT_DIR[2] * (meas3 - home_offset[2]) / JOINT_GEAR[2];
     fk(meas_x, meas_y, meas_z, q1, q2, q3);                // measured end-effector pos
 }
   telemetry.update(now);

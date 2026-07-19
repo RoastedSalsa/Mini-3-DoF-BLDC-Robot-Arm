@@ -114,22 +114,48 @@ constexpr float HOME_X = 0.050;
 constexpr float HOME_Y = 0.050;
 constexpr float HOME_Z = 0.03;
 
-// ========================= Gravity feedforward (optional) ====================
-// Optional gravity compensation applied as a q-axis feedforward VOLTAGE on top
-// of the angle-control loop (voltage-mode torque control). See lib/GravityFF.
-// Fill in the dynamics in GravityFF.cpp and the parameters below, then enable.
+// ====================== Dynamics feedforward (optional) ======================
+// Model-based feedforward applied as a q-axis VOLTAGE on top of the angle-control
+// loop (voltage-mode torque control). See lib/Dynamics for the derivation of
+//     tau = M(q) qdd + C(q, qd) qd + G(q)
 //
-// GRAVITY_FF_DEFAULT_ON is the runtime state at boot; live-toggle with the 'F'
-// Commander command.
-constexpr bool  GRAVITY_FF_DEFAULT_ON = false;
+// DYN_FF_DEFAULT_ON is the master enable at boot; live-toggle with 'F'.
+constexpr bool  DYN_FF_DEFAULT_ON = false;
 constexpr float GRAV_G = 9.81f;                 // gravitational accel [m/s^2]
+
+// --- Which terms of the model to evaluate ------------------------------------
+// Boot-time defaults; each is independently toggled at runtime with 'D' (see
+// main.cpp), so these are just the starting point. Bring the model up one term
+// at a time: gravity alone is well-conditioned and safe, while inertia and the
+// velocity-product terms depend on differentiated setpoints and on the inertia
+// parameters below being roughly right.
+constexpr bool DYN_ENABLE_GRAVITY     = true;
+constexpr bool DYN_ENABLE_INERTIA     = false;
+constexpr bool DYN_ENABLE_CENTRIFUGAL = false;
+constexpr bool DYN_ENABLE_CORIOLIS    = false;
 
 // --- Link dynamic parameters (MEASURE / ESTIMATE these) ----------------------
 // Link 2 = upper arm (length L2); link 3 = forearm + any payload (length L3).
-constexpr float LINK2_MASS = 0.0f;   // mass of link 2 [kg]
-constexpr float LINK3_MASS = 0.0f;   // mass of link 3 (+ payload) [kg]
-constexpr float LINK2_COM  = 0.0f;   // COM dist. from joint-2 axis along L2 [m]
-constexpr float LINK3_COM  = 0.0f;   // COM dist. from joint-3 axis along L3 [m]
+constexpr float LINK2_MASS = 0.03714f;   // mass of link 2 [kg]
+constexpr float LINK3_MASS = 0.02443f;   // mass of link 3 (+ payload) [kg]
+constexpr float LINK2_COM  = 0.1f;   // COM dist. from joint-2 axis along L2 [m]
+constexpr float LINK3_COM  = 0.1f;   // COM dist. from joint-3 axis along L3 [m]
+
+// Rotational inertia about each link's OWN centre of mass [kg·m^2]. Only used by
+// the DYN_INERTIA term. Link 1 is the base yaw stage, about the vertical axis;
+// links 2 and 3 are about their pitch axes. A slender rod of mass m and length l
+// gives m*l^2/12, which is the right order of magnitude to start from.
+constexpr float LINK1_INERTIA = 0.0f;
+constexpr float LINK2_INERTIA = LINK2_MASS * L2 * L2 / 12.0f;
+constexpr float LINK3_INERTIA = LINK3_MASS * L3 * L3 / 12.0f;
+
+// --- Setpoint differentiation -------------------------------------------------
+// qd and qdd are obtained by differentiating the IK joint setpoints, so both are
+// low-pass filtered (first-order, time constant [s]) to keep the step-shaped
+// output of a LINEAR-eased trajectory from producing acceleration spikes. Raise
+// these if the feedforward looks noisy; lower them if it lags the motion.
+constexpr float DYN_VEL_LPF_TF   = 0.02f;
+constexpr float DYN_ACCEL_LPF_TF = 0.05f;
 
 // --- Torque -> voltage mapping (Vq = tau * R / Kt) ---------------------------
 // Per-joint motor torque constant Kt [N·m/A] and phase resistance R [ohm].
@@ -144,8 +170,8 @@ constexpr float M3_PHASE_RESISTANCE = 0.0f;
 // Overall feedforward scale (0..1) for ramp-in / detuning while testing, and a
 // hard clamp [V] on the injected feedforward per motor (defense against a bad
 // model). The final voltage.q is still clamped to VOLTAGE_LIMIT afterwards.
-constexpr float GRAV_FF_GAIN          = 1.0f;
-constexpr float GRAV_FF_VOLTAGE_LIMIT = 3.0f;
+constexpr float DYN_FF_GAIN          = 1.0f;
+constexpr float DYN_FF_VOLTAGE_LIMIT = 3.0f;
 
 // =============================== Trajectory ==================================
 // Continuous Cartesian waypoint loop (see lib/Trajectory). The arm cycles
