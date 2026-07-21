@@ -134,20 +134,28 @@ constexpr bool DYN_ENABLE_INERTIA     = false;
 constexpr bool DYN_ENABLE_CENTRIFUGAL = false;
 constexpr bool DYN_ENABLE_CORIOLIS    = false;
 
-// --- Link dynamic parameters (MEASURE / ESTIMATE these) ----------------------
+// --- Link dynamic parameters (from CAD) --------------------------------------
 // Link 2 = upper arm (length L2); link 3 = forearm + any payload (length L3).
-constexpr float LINK2_MASS = 0.03714f;   // mass of link 2 [kg]
-constexpr float LINK3_MASS = 0.02443f;   // mass of link 3 (+ payload) [kg]
-constexpr float LINK2_COM  = 0.1f;   // COM dist. from joint-2 axis along L2 [m]
-constexpr float LINK3_COM  = 0.1f;   // COM dist. from joint-3 axis along L3 [m]
+// Derived by rigid-body lumping of the Onshape export
+// (ros2/src/full_assembly/urdf/full_assembly.urdf); see description/mini_ranka.urdf.
+//   LINK2 = link2 + gbm2804_stator        LINK3 = gbm2804_rotor + link3
+// NOTE: LINK3_COM is ~0.053 m, not the mid-link 0.1 m you would guess — the
+// GBM2804 elbow rotor sits right at the joint and pulls the COM inboard.
+constexpr float LINK2_MASS = 0.099447f;  // mass of link 2 [kg]
+constexpr float LINK3_MASS = 0.080946f;  // mass of link 3 (+ payload) [kg]
+constexpr float LINK2_COM  = 0.102579f;  // COM dist. from joint-2 axis along L2 [m]
+constexpr float LINK3_COM  = 0.052760f;  // COM dist. from joint-3 axis along L3 [m]
 
 // Rotational inertia about each link's OWN centre of mass [kg·m^2]. Only used by
 // the DYN_INERTIA term. Link 1 is the base yaw stage, about the vertical axis;
-// links 2 and 3 are about their pitch axes. A slender rod of mass m and length l
-// gives m*l^2/12, which is the right order of magnitude to start from.
-constexpr float LINK1_INERTIA = 0.0f;
-constexpr float LINK2_INERTIA = LINK2_MASS * L2 * L2 / 12.0f;
-constexpr float LINK3_INERTIA = LINK3_MASS * L3 * L3 / 12.0f;
+// links 2 and 3 are about their pitch axes. Values are the CAD inertia tensors
+// (izz for the yaw stage, iyy for the pitch links) rather than the m*l^2/12
+// slender-rod estimate, which underestimates link 2 by 1.45x.
+// LINK1_INERTIA is the shoulder yoke (yaws but does not pitch), parallel-axis
+// shifted onto the yaw axis: 1.5278e-4 + 0.16421*0.025482^2.
+constexpr float LINK1_INERTIA = 2.593981e-4f;
+constexpr float LINK2_INERTIA = 4.818199e-4f;
+constexpr float LINK3_INERTIA = 2.791125e-4f;
 
 // --- Setpoint differentiation -------------------------------------------------
 // qd and qdd are obtained by differentiating the IK joint setpoints, so both are

@@ -11596,6 +11596,8 @@ environments:
       - conda: https://prefix.dev/robostack-lyrical/linux-64/ros-lyrical-image-transport-6.4.8-np2py314hb48eaa3_20.conda
       - conda: https://prefix.dev/robostack-lyrical/linux-64/ros-lyrical-interactive-markers-2.8.4-np2py314hb48eaa3_20.conda
       - conda: https://prefix.dev/robostack-lyrical/linux-64/ros-lyrical-intra-process-demo-0.37.8-np2py314h0c56e83_20.conda
+      - conda: https://prefix.dev/robostack-lyrical/linux-64/ros-lyrical-joint-state-publisher-2.4.2-np2py314hb48eaa3_20.conda
+      - conda: https://prefix.dev/robostack-lyrical/linux-64/ros-lyrical-joint-state-publisher-gui-2.4.2-np2py314hb48eaa3_20.conda
       - conda: https://prefix.dev/robostack-lyrical/linux-64/ros-lyrical-joy-3.3.0-np2py314hb48eaa3_20.conda
       - conda: https://prefix.dev/robostack-lyrical/linux-64/ros-lyrical-kdl-parser-3.0.1-np2py314hb48eaa3_20.conda
       - conda: https://prefix.dev/robostack-lyrical/linux-64/ros-lyrical-keyboard-handler-0.5.1-np2py314hb48eaa3_20.conda
@@ -12337,6 +12339,8 @@ environments:
       - conda: https://prefix.dev/robostack-lyrical/linux-aarch64/ros-lyrical-image-transport-6.4.8-np2py314h2824dc6_20.conda
       - conda: https://prefix.dev/robostack-lyrical/linux-aarch64/ros-lyrical-interactive-markers-2.8.4-np2py314h2824dc6_20.conda
       - conda: https://prefix.dev/robostack-lyrical/linux-aarch64/ros-lyrical-intra-process-demo-0.37.8-np2py314h3d27a0f_20.conda
+      - conda: https://prefix.dev/robostack-lyrical/linux-aarch64/ros-lyrical-joint-state-publisher-2.4.2-np2py314h2824dc6_20.conda
+      - conda: https://prefix.dev/robostack-lyrical/linux-aarch64/ros-lyrical-joint-state-publisher-gui-2.4.2-np2py314h2824dc6_20.conda
       - conda: https://prefix.dev/robostack-lyrical/linux-aarch64/ros-lyrical-joy-3.3.0-np2py314h2824dc6_20.conda
       - conda: https://prefix.dev/robostack-lyrical/linux-aarch64/ros-lyrical-kdl-parser-3.0.1-np2py314h2824dc6_20.conda
       - conda: https://prefix.dev/robostack-lyrical/linux-aarch64/ros-lyrical-keyboard-handler-0.5.1-np2py314h2824dc6_20.conda
@@ -13033,6 +13037,8 @@ environments:
       - conda: https://prefix.dev/robostack-lyrical/osx-64/ros-lyrical-image-transport-6.4.8-np2py314h8fa4802_20.conda
       - conda: https://prefix.dev/robostack-lyrical/osx-64/ros-lyrical-interactive-markers-2.8.4-np2py314h8fa4802_20.conda
       - conda: https://prefix.dev/robostack-lyrical/osx-64/ros-lyrical-intra-process-demo-0.37.8-np2py314h2db802a_20.conda
+      - conda: https://prefix.dev/robostack-lyrical/osx-64/ros-lyrical-joint-state-publisher-2.4.2-np2py314h8fa4802_20.conda
+      - conda: https://prefix.dev/robostack-lyrical/osx-64/ros-lyrical-joint-state-publisher-gui-2.4.2-np2py314h8fa4802_20.conda
       - conda: https://prefix.dev/robostack-lyrical/osx-64/ros-lyrical-joy-3.3.0-np2py314h8fa4802_20.conda
       - conda: https://prefix.dev/robostack-lyrical/osx-64/ros-lyrical-kdl-parser-3.0.1-np2py314h8fa4802_20.conda
       - conda: https://prefix.dev/robostack-lyrical/osx-64/ros-lyrical-keyboard-handler-0.5.1-np2py314h8fa4802_20.conda
@@ -13725,6 +13731,8 @@ environments:
       - conda: https://prefix.dev/robostack-lyrical/osx-arm64/ros-lyrical-image-transport-6.4.8-np2py314h1e5664e_20.conda
       - conda: https://prefix.dev/robostack-lyrical/osx-arm64/ros-lyrical-interactive-markers-2.8.4-np2py314h1e5664e_20.conda
       - conda: https://prefix.dev/robostack-lyrical/osx-arm64/ros-lyrical-intra-process-demo-0.37.8-np2py314h0b3730b_20.conda
+      - conda: https://prefix.dev/robostack-lyrical/osx-arm64/ros-lyrical-joint-state-publisher-2.4.2-np2py314h1e5664e_20.conda
+      - conda: https://prefix.dev/robostack-lyrical/osx-arm64/ros-lyrical-joint-state-publisher-gui-2.4.2-np2py314h1e5664e_20.conda
       - conda: https://prefix.dev/robostack-lyrical/osx-arm64/ros-lyrical-joy-3.3.0-np2py314h1e5664e_20.conda
       - conda: https://prefix.dev/robostack-lyrical/osx-arm64/ros-lyrical-kdl-parser-3.0.1-np2py314h1e5664e_20.conda
       - conda: https://prefix.dev/robostack-lyrical/osx-arm64/ros-lyrical-keyboard-handler-0.5.1-np2py314h1e5664e_20.conda
@@ -14374,6 +14382,8 @@ environments:
       - conda: https://prefix.dev/robostack-lyrical/win-64/ros-lyrical-image-transport-6.4.8-np2py314ha8c8437_20.conda
       - conda: https://prefix.dev/robostack-lyrical/win-64/ros-lyrical-interactive-markers-2.8.4-np2py314ha8c8437_20.conda
       - conda: https://prefix.dev/robostack-lyrical/win-64/ros-lyrical-intra-process-demo-0.37.8-np2py314hf7dcb66_20.conda
+      - conda: https://prefix.dev/robostack-lyrical/win-64/ros-lyrical-joint-state-publisher-2.4.2-np2py314ha8c8437_20.conda
+      - conda: https://prefix.dev/robostack-lyrical/win-64/ros-lyrical-joint-state-publisher-gui-2.4.2-np2py314ha8c8437_20.conda
       - conda: https://prefix.dev/robostack-lyrical/win-64/ros-lyrical-joy-3.3.0-np2py314ha8c8437_20.conda
       - conda: https://prefix.dev/robostack-lyrical/win-64/ros-lyrical-kdl-parser-3.0.1-np2py314ha8c8437_20.conda
       - conda: https://prefix.dev/robostack-lyrical/win-64/ros-lyrical-keyboard-handler-0.5.1-np2py314ha8c8437_20.conda
@@ -157940,6 +157950,47 @@ packages:
   run_exports: {}
   size: 519639
   timestamp: 1779332977885
+- conda: https://prefix.dev/robostack-lyrical/linux-64/ros-lyrical-joint-state-publisher-2.4.2-np2py314hb48eaa3_20.conda
+  sha256: 3b4c033226b01bdeda05b37aa43577af0a5d0a62dab31630d67d6a1f386d96b1
+  md5: 338024d736aed7b64707735f76f58583
+  depends:
+  - packaging
+  - python
+  - ros-lyrical-rclpy
+  - ros-lyrical-ros-workspace
+  - ros-lyrical-sensor-msgs
+  - ros-lyrical-std-msgs
+  - ros2-distro-mutex 0.16.* lyrical_*
+  - libgcc >=14
+  - libstdcxx >=14
+  - __glibc >=2.28,<3.0.a0
+  - numpy >=1.23,<3
+  - ros2-distro-mutex >=0.16.0,<0.17.0a0
+  - python_abi 3.14.* *_cp314
+  license: BSD-3-Clause
+  run_exports: {}
+  size: 51302
+  timestamp: 1779337544032
+- conda: https://prefix.dev/robostack-lyrical/linux-64/ros-lyrical-joint-state-publisher-gui-2.4.2-np2py314hb48eaa3_20.conda
+  sha256: 290c4d57f0f2b4acb9eb7fe1ff07effd3993513cbe9ebd1933067638140d5a8d
+  md5: 6df85c0b14dc29f8bfe2219bf0fc5309
+  depends:
+  - python
+  - ros-lyrical-joint-state-publisher
+  - ros-lyrical-python-qt-binding
+  - ros-lyrical-rclpy
+  - ros-lyrical-ros-workspace
+  - ros2-distro-mutex 0.16.* lyrical_*
+  - __glibc >=2.28,<3.0.a0
+  - libstdcxx >=14
+  - libgcc >=14
+  - numpy >=1.23,<3
+  - ros2-distro-mutex >=0.16.0,<0.17.0a0
+  - python_abi 3.14.* *_cp314
+  license: BSD-3-Clause
+  run_exports: {}
+  size: 29041
+  timestamp: 1779337959215
 - conda: https://prefix.dev/robostack-lyrical/linux-64/ros-lyrical-joy-3.3.0-np2py314hb48eaa3_20.conda
   sha256: e1a33ee7abd53857334284f921f35c6d4df005657ff3db2fa9c58ac0c0d84422
   md5: db4bfc3e1b295698d1cd12006efd1ae2
@@ -164792,6 +164843,47 @@ packages:
   run_exports: {}
   size: 537720
   timestamp: 1779332460771
+- conda: https://prefix.dev/robostack-lyrical/linux-aarch64/ros-lyrical-joint-state-publisher-2.4.2-np2py314h2824dc6_20.conda
+  sha256: 48d29c78b84cd9b4175655c4d35653f3e59f15373e6dd465909e8c28262cc906
+  md5: ef4b3afcf5d25746bfc669e7616adfe8
+  depends:
+  - packaging
+  - python
+  - ros-lyrical-rclpy
+  - ros-lyrical-ros-workspace
+  - ros-lyrical-sensor-msgs
+  - ros-lyrical-std-msgs
+  - ros2-distro-mutex 0.16.* lyrical_*
+  - libstdcxx >=14
+  - libgcc >=14
+  - __glibc >=2.28,<3.0.a0
+  - python_abi 3.14.* *_cp314
+  - numpy >=1.23,<3
+  - ros2-distro-mutex >=0.16.0,<0.17.0a0
+  license: BSD-3-Clause
+  run_exports: {}
+  size: 51205
+  timestamp: 1779337591940
+- conda: https://prefix.dev/robostack-lyrical/linux-aarch64/ros-lyrical-joint-state-publisher-gui-2.4.2-np2py314h2824dc6_20.conda
+  sha256: 4d25f4a42858dbfb897a10c1793ed00c583fb3801c3cd8641e7580d758219ff8
+  md5: d01515f71ab64a06210e321e9ad32450
+  depends:
+  - python
+  - ros-lyrical-joint-state-publisher
+  - ros-lyrical-python-qt-binding
+  - ros-lyrical-rclpy
+  - ros-lyrical-ros-workspace
+  - ros2-distro-mutex 0.16.* lyrical_*
+  - libstdcxx >=14
+  - libgcc >=14
+  - __glibc >=2.28,<3.0.a0
+  - python_abi 3.14.* *_cp314
+  - numpy >=1.23,<3
+  - ros2-distro-mutex >=0.16.0,<0.17.0a0
+  license: BSD-3-Clause
+  run_exports: {}
+  size: 29165
+  timestamp: 1779337926060
 - conda: https://prefix.dev/robostack-lyrical/linux-aarch64/ros-lyrical-joy-3.3.0-np2py314h2824dc6_20.conda
   sha256: d7f77f71261dde626e055a1159a7215154139ae3672ad9417e6ad6da1c940f19
   md5: 41bee067a81e45417ea135a7e90ce8c4
@@ -171423,6 +171515,45 @@ packages:
   run_exports: {}
   size: 390698
   timestamp: 1779351895421
+- conda: https://prefix.dev/robostack-lyrical/osx-64/ros-lyrical-joint-state-publisher-2.4.2-np2py314h8fa4802_20.conda
+  sha256: 90f3fa518dab9bec78eb0c2a0134c30b217724abcb67133474a064664b3f9ed7
+  md5: b1f59d6d8498aef735169fc55eb1e667
+  depends:
+  - packaging
+  - python
+  - ros-lyrical-rclpy
+  - ros-lyrical-ros-workspace
+  - ros-lyrical-sensor-msgs
+  - ros-lyrical-std-msgs
+  - ros2-distro-mutex 0.16.* lyrical_*
+  - libcxx >=18
+  - __osx >=11.0
+  - python_abi 3.14.* *_cp314
+  - numpy >=1.23,<3
+  - ros2-distro-mutex >=0.16.0,<0.17.0a0
+  license: BSD-3-Clause
+  run_exports: {}
+  size: 49637
+  timestamp: 1779357135672
+- conda: https://prefix.dev/robostack-lyrical/osx-64/ros-lyrical-joint-state-publisher-gui-2.4.2-np2py314h8fa4802_20.conda
+  sha256: 61850317bd675c7a65ae7991859e6713ec6631f7a29b442dc53ab5fabfa7469e
+  md5: 31847cc5d7702cd318cd8eac4bdf37ef
+  depends:
+  - python
+  - ros-lyrical-joint-state-publisher
+  - ros-lyrical-python-qt-binding
+  - ros-lyrical-rclpy
+  - ros-lyrical-ros-workspace
+  - ros2-distro-mutex 0.16.* lyrical_*
+  - __osx >=11.0
+  - libcxx >=18
+  - ros2-distro-mutex >=0.16.0,<0.17.0a0
+  - python_abi 3.14.* *_cp314
+  - numpy >=1.23,<3
+  license: BSD-3-Clause
+  run_exports: {}
+  size: 29960
+  timestamp: 1779360510625
 - conda: https://prefix.dev/robostack-lyrical/osx-64/ros-lyrical-joy-3.3.0-np2py314h8fa4802_20.conda
   sha256: 6f04bbed83cb3ceb4c233f78ea705f3b402a6e7f25c68b60bbcb77af81afdc55
   md5: c4eb1b925701cd7cb19e6b0a4f0c6695
@@ -177733,6 +177864,45 @@ packages:
   run_exports: {}
   size: 368958
   timestamp: 1779343896706
+- conda: https://prefix.dev/robostack-lyrical/osx-arm64/ros-lyrical-joint-state-publisher-2.4.2-np2py314h1e5664e_20.conda
+  sha256: e75e377db4ec353ad2fb05032a90ed3ca5fdc242c63fb1ebf36178fe3884f307
+  md5: d7b4d546d80c0fb10ea8c1265e2bbe1e
+  depends:
+  - packaging
+  - python
+  - ros-lyrical-rclpy
+  - ros-lyrical-ros-workspace
+  - ros-lyrical-sensor-msgs
+  - ros-lyrical-std-msgs
+  - ros2-distro-mutex 0.16.* lyrical_*
+  - __osx >=11.0
+  - libcxx >=18
+  - python_abi 3.14.* *_cp314
+  - numpy >=1.23,<3
+  - ros2-distro-mutex >=0.16.0,<0.17.0a0
+  license: BSD-3-Clause
+  run_exports: {}
+  size: 49787
+  timestamp: 1779345514890
+- conda: https://prefix.dev/robostack-lyrical/osx-arm64/ros-lyrical-joint-state-publisher-gui-2.4.2-np2py314h1e5664e_20.conda
+  sha256: b7d9f2fdf2f3be19c255e3169e6edbe0ed01ef499e3483251f88d48b025b88b0
+  md5: bac2bd8df94c4d3d86172e384903219b
+  depends:
+  - python
+  - ros-lyrical-joint-state-publisher
+  - ros-lyrical-python-qt-binding
+  - ros-lyrical-rclpy
+  - ros-lyrical-ros-workspace
+  - ros2-distro-mutex 0.16.* lyrical_*
+  - __osx >=11.0
+  - libcxx >=18
+  - numpy >=1.23,<3
+  - python_abi 3.14.* *_cp314
+  - ros2-distro-mutex >=0.16.0,<0.17.0a0
+  license: BSD-3-Clause
+  run_exports: {}
+  size: 29998
+  timestamp: 1779346502029
 - conda: https://prefix.dev/robostack-lyrical/osx-arm64/ros-lyrical-joy-3.3.0-np2py314h1e5664e_20.conda
   sha256: 6237506815968e1f14a7df58cf1d3711800825a5da8bf36d23b361c1d802a2fc
   md5: 71a3fd410f0def13e2ae692ce408007b
@@ -184142,6 +184312,47 @@ packages:
   run_exports: {}
   size: 315913
   timestamp: 1779360419433
+- conda: https://prefix.dev/robostack-lyrical/win-64/ros-lyrical-joint-state-publisher-2.4.2-np2py314ha8c8437_20.conda
+  sha256: d9e67685fec314ea6fa4f169b1e524efed77c7ff6ffd940d1ceb0a8129b49022
+  md5: a5b2f72c3d74402c9d87d361076109d5
+  depends:
+  - packaging
+  - python
+  - ros-lyrical-rclpy
+  - ros-lyrical-ros-workspace
+  - ros-lyrical-sensor-msgs
+  - ros-lyrical-std-msgs
+  - ros2-distro-mutex 0.16.* lyrical_*
+  - vc >=14.3,<15
+  - vc14_runtime >=14.44.35208
+  - ucrt >=10.0.20348.0
+  - python_abi 3.14.* *_cp314
+  - ros2-distro-mutex >=0.16.0,<0.17.0a0
+  - numpy >=1.23,<3
+  license: BSD-3-Clause
+  run_exports: {}
+  size: 55133
+  timestamp: 1779367211459
+- conda: https://prefix.dev/robostack-lyrical/win-64/ros-lyrical-joint-state-publisher-gui-2.4.2-np2py314ha8c8437_20.conda
+  sha256: 8d1ddaa4a02fb1857143aa12218422dbd32c5fcbc549cd1fa33ab2caf2ff1f73
+  md5: bce8e574152ea7991059a02daa0d1f39
+  depends:
+  - python
+  - ros-lyrical-joint-state-publisher
+  - ros-lyrical-python-qt-binding
+  - ros-lyrical-rclpy
+  - ros-lyrical-ros-workspace
+  - ros2-distro-mutex 0.16.* lyrical_*
+  - vc >=14.3,<15
+  - vc14_runtime >=14.44.35208
+  - ucrt >=10.0.20348.0
+  - numpy >=1.23,<3
+  - ros2-distro-mutex >=0.16.0,<0.17.0a0
+  - python_abi 3.14.* *_cp314
+  license: BSD-3-Clause
+  run_exports: {}
+  size: 35229
+  timestamp: 1779369747162
 - conda: https://prefix.dev/robostack-lyrical/win-64/ros-lyrical-joy-3.3.0-np2py314ha8c8437_20.conda
   sha256: 4fd019831a47176f19f8ed4c90fafb74206bef384043f3522bab8fb4768ccdc8
   md5: 95abacf42a9ef21b3aa7ca0a217679ab

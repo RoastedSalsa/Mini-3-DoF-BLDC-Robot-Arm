@@ -81,6 +81,8 @@ channels = ["https://prefix.dev/robostack-lyrical"]
 
 [feature.lyrical.dependencies]
 ros-lyrical-desktop = "*"
+# Slider GUI for driving the URDF joints in RViz (not pulled in by -desktop).
+ros-lyrical-joint-state-publisher-gui = "*"
 
 # PlotJuggler with the ROS2 Topic Subscriber plugin (linux-only: not published for win/osx)
 [feature.lyrical.target.linux-64.dependencies]

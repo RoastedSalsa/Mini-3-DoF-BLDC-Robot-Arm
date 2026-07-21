@@ -3,96 +3,135 @@
   mini_ranka.urdf — reference kinematic/dynamic model of the Mini 3-DoF BLDC arm.
 
   Mirrors firmware/lib/ArmKinematics (ik/fk) and firmware/include/config.h:
-    L1 = 0.0843 m  (base column height, joint-1 axis -> joint-2 axis)
-    L2 = 0.2000 m  (upper arm, link 2)
-    L3 = 0.2000 m  (forearm, link 3)
+    L1 = 0.0843 m  (base plane -> shoulder-pitch axis)
+    L2 = 0.2000 m  (upper arm, shoulder axis -> elbow axis)
+    L3 = 0.2000 m  (forearm, elbow axis -> tool)
 
   Joint convention (matches the IK):
     joint1 : base yaw about world +Z          -> gravity torque = 0
     joint2 : shoulder pitch, from horizontal  (fk: z += L2*sin q2, r = L2*cos q2)
     joint3 : elbow pitch, relative to link 2  (fk: z += L3*sin(q2+q3))
-  At q2 = q3 = 0 the arm points straight out along +X (horizontal).
+  At q2 = q3 = 0 the arm points straight out along +X (horizontal), tool at
+  (L2+L3, 0, L1) = (0.4, 0, 0.0843).
 
-  NOTE — signs & inertials are PLACEHOLDERS for you to fill:
-   * Pitch joints use axis "0 1 0". Rotation about +Y lowers z, whereas the
-     firmware fk() raises z with +q2. If you drive this URDF from measured joint
-     angles, either flip to axis "0 -1 0" or negate q2/q3 — pick whichever makes
-     RViz match the hardware, then keep it consistent.
-   * <mass>, <origin> (COM) and <inertia> are rough/placeholder. Replace with your
-     CAD values; the same masses/COM feed the gravity model in GravityFF.cpp
-     (LINK2_MASS, LINK2_COM, LINK3_MASS, LINK3_COM in config.h).
+  Pitch axes are "0 -1 0" so that +q2/+q3 RAISE the arm, matching fk()'s
+  z += L2*sin(q2). (Rotation about +Y would lower it.)
+
+  joint1 and joint2 are COINCIDENT at z = L1. joint1 yaws shoulder_link (the
+  motor yoke carrying the shoulder bearing and the belt-driven elbow motor);
+  joint2 then pitches the upper arm about the same point. This is what fk()
+  assumes, and it is what the CAD does.
+
+  INERTIALS: derived from the Onshape CAD export
+  (ros2/src/full_assembly/urdf/full_assembly.urdf) by rigid-body lumping of the
+  constituent parts about each body's combined COM. Total mass 0.5287 kg.
+  Frames are world-aligned at the zero configuration, so inertia rpy is 0 0 0.
+  The same masses/COMs feed the gravity model in Dynamics.cpp
+  (LINK2_MASS, LINK2_COM, LINK3_MASS, LINK3_COM in config.h).
 -->
 <robot name="mini_ranka">
 
-  <!-- ====================== Base ====================== -->
+  <!-- ====================== Base (fixed) ====================== -->
+  <!-- CAD parts lumped: base, gm3506_stator_1 -->
   <link name="base_link">
     <visual>
-      <origin xyz="0 0 0.04215" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.03" length="0.0843"/></geometry>
+      <origin xyz="0 0 0.0169" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.03" length="0.0338"/></geometry>
     </visual>
     <inertial>
-      <origin xyz="0 0 0.04215" rpy="0 0 0"/>
-      <mass value="0.5"/>
-      <inertia ixx="1e-3" iyy="1e-3" izz="1e-3" ixy="0" ixz="0" iyz="0"/>
+      <origin xyz="-0.000794 0 0.020253" rpy="0 0 0"/>
+      <mass value="0.184073"/>
+      <inertia ixx="2.092157e-04" ixy="-1.860735e-11" ixz="5.989436e-07"
+               iyy="2.041500e-04" iyz="-2.200044e-12" izz="3.866800e-04"/>
     </inertial>
   </link>
 
   <!-- joint1: base yaw about vertical Z. No gravity torque. -->
   <joint name="joint1" type="revolute">
     <parent link="base_link"/>
-    <child  link="link2"/>
-    <origin xyz="0 0 0.0843" rpy="0 0 0"/>   <!-- top of the L1 column -->
+    <child  link="shoulder_link"/>
+    <origin xyz="0 0 0.0843" rpy="0 0 0"/>   <!-- L1: shoulder-pitch axis height -->
     <axis xyz="0 0 1"/>
     <limit lower="-2.0" upper="2.0" effort="5.0" velocity="10.0"/>
   </joint>
 
+  <!-- ============ Shoulder yoke (yaws only, does not pitch) ============ -->
+  <!-- CAD parts lumped: gm3506_rotor_1, link1_body, link1_attachment,
+       bearring, gm3506_stator, gm3506_rotor, gt2_20t
+       31% of robot mass; contributes to joint-1 inertia, zero gravity torque. -->
+  <link name="shoulder_link">
+    <visual>
+      <origin xyz="0 0 -0.02525" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.025" length="0.0505"/></geometry>
+    </visual>
+    <inertial>
+      <origin xyz="-0.022090 -0.012702 -0.019528" rpy="0 0 0"/>
+      <mass value="0.164210"/>
+      <inertia ixx="7.790824e-05" ixy="-2.024368e-05" ixz="3.935686e-05"
+               iyy="1.818876e-04" iyz="1.771228e-05" izz="1.527751e-04"/>
+    </inertial>
+  </link>
+
+  <!-- joint2: shoulder pitch, coincident with joint1. -->
+  <joint name="joint2" type="revolute">
+    <parent link="shoulder_link"/>
+    <child  link="link2"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>   <!-- coincident with joint1 -->
+    <axis xyz="0 -1 0"/>
+    <limit lower="-2.0" upper="2.0" effort="5.0" velocity="10.0"/>
+  </joint>
+
   <!-- ====================== Link 2 (upper arm, L2) ====================== -->
+  <!-- CAD parts lumped: link2, gbm2804_stator -->
   <link name="link2">
     <visual>
       <origin xyz="0.1 0 0" rpy="0 1.5708 0"/>   <!-- centered along +X -->
       <geometry><cylinder radius="0.015" length="0.2"/></geometry>
     </visual>
     <inertial>
-      <!-- COM at LINK2_COM from the joint-2 axis; edit to match config.h -->
-      <origin xyz="0.1 0 0" rpy="0 0 0"/>
-      <mass value="0.2"/>
-      <inertia ixx="1e-4" iyy="1e-3" izz="1e-3" ixy="0" ixz="0" iyz="0"/>
+      <!-- LINK2_COM = 0.102579 m from the joint-2 axis along +X -->
+      <origin xyz="0.102579 -0.003267 0" rpy="0 0 0"/>
+      <mass value="0.099447"/>
+      <inertia ixx="1.441999e-05" ixy="-1.951234e-06" ixz="-4.523308e-10"
+               iyy="4.818199e-04" iyz="-7.562271e-11" izz="4.701816e-04"/>
     </inertial>
   </link>
 
-  <!-- joint2: shoulder pitch. -->
-  <joint name="joint2" type="revolute">
+  <!-- joint3: elbow pitch (axis parallel to joint2). -->
+  <joint name="joint3" type="revolute">
     <parent link="link2"/>
     <child  link="link3"/>
     <origin xyz="0.2 0 0" rpy="0 0 0"/>   <!-- end of link 2 (L2) -->
-    <axis xyz="0 1 0"/>
+    <axis xyz="0 -1 0"/>
     <limit lower="-2.0" upper="2.0" effort="5.0" velocity="10.0"/>
   </joint>
 
   <!-- ====================== Link 3 (forearm, L3) ====================== -->
+  <!-- CAD parts lumped: gbm2804_rotor, link3 -->
   <link name="link3">
     <visual>
       <origin xyz="0.1 0 0" rpy="0 1.5708 0"/>
       <geometry><cylinder radius="0.012" length="0.2"/></geometry>
     </visual>
     <inertial>
-      <!-- COM at LINK3_COM from the joint-3 axis; edit to match config.h -->
-      <origin xyz="0.1 0 0" rpy="0 0 0"/>
-      <mass value="0.15"/>
-      <inertia ixx="1e-4" iyy="1e-3" izz="1e-3" ixy="0" ixz="0" iyz="0"/>
+      <!-- LINK3_COM = 0.052760 m from the joint-3 axis along +X.
+           Much closer in than link 2's: the GBM2804 rotor sits at the elbow. -->
+      <origin xyz="0.052760 0.009364 0" rpy="0 0 0"/>
+      <mass value="0.080946"/>
+      <inertia ixx="1.010315e-05" ixy="2.806572e-05" ixz="5.290743e-09"
+               iyy="2.791125e-04" iyz="-3.271944e-10" izz="2.791900e-04"/>
     </inertial>
   </link>
 
-  <!-- joint3: elbow pitch (fixed axis parallel to joint2). -->
-  <joint name="joint3" type="revolute">
+  <!-- ====================== End effector ====================== -->
+  <!-- Massless frame at the tool point. Add payload mass HERE (and fold it
+       into LINK3_MASS/LINK3_COM in config.h) when carrying a load. -->
+  <joint name="tool_joint" type="fixed">
     <parent link="link3"/>
     <child  link="tool_link"/>
     <origin xyz="0.2 0 0" rpy="0 0 0"/>   <!-- end of link 3 (L3) -->
-    <axis xyz="0 1 0"/>
-    <limit lower="-2.0" upper="2.0" effort="5.0" velocity="10.0"/>
   </joint>
 
-  <!-- ====================== End effector ====================== -->
   <link name="tool_link">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -100,8 +139,8 @@
     </visual>
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="0.01"/>
-      <inertia ixx="1e-6" iyy="1e-6" izz="1e-6" ixy="0" ixz="0" iyz="0"/>
+      <mass value="1e-09"/>
+      <inertia ixx="4e-14" iyy="4e-14" izz="4e-14" ixy="0" ixz="0" iyz="0"/>
     </inertial>
   </link>
 
