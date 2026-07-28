@@ -2,6 +2,10 @@
 build/
 install/
 log/
+# Python bytecode. Note: 4 .pyc files were committed before this rule existed
+# and stay tracked until `git rm --cached` clears them.
+__pycache__/
+*.py[cod]
 # pixi environments
 .pixi/*
 !.pixi/config.toml

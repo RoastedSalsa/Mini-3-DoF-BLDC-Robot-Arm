@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>mini_ranka_description</name>
+  <version>0.1.0</version>
+  <description>
+    The Mini_Ranka robot model used by the digital twin: Onshape CAD geometry
+    reworked onto the firmware's kinematic convention, so /joint_states values
+    mean the same thing here as q1/q2/q3 do in ArmKinematics.cpp.
+
+    Meshes are reused from the full_assembly package (the raw CAD export) rather
+    than copied, so a re-export only has to land in one place.
+  </description>
+  <maintainer email="augustasger@gmail.com">Augustas</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Supplies package://full_assembly/meshes/*.stl, referenced by the URDF. -->
+  <exec_depend>full_assembly</exec_depend>
+
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>python3-pytest</test_depend>
+  <test_depend>python3-numpy</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

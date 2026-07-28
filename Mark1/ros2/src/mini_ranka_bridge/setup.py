@@ -25,6 +25,9 @@ setup(
         "console_scripts": [
             "telemetry_bridge = mini_ranka_bridge.telemetry_bridge:main",
             "tune = mini_ranka_bridge.tune:main",
+            # Digital-twin joint sources — exactly one of these should run.
+            "joint_state_bridge = mini_ranka_bridge.joint_state_bridge:main",
+            "mock_arm = mini_ranka_bridge.mock_arm:main",
         ],
     },
 )

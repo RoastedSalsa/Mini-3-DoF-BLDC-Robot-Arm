@@ -46,6 +46,9 @@ The result is closer to industrial-quality motion on a hobbyist budget.
 - **Single-MCU architecture:** the STM32 G474RE has enough PWM channels to drive all three motors directly, avoiding the dual-MCU workaround used in some earlier projects.
 - **Forward / inverse kinematics:** analytical solution is done on paper, in MATLAB and also implemented into the C++ robot arm code.
 - **Trajectory generation:** basic square trajectory is used to test the kinematics.
+- **Digital twin:** the CAD model in RViz, mirroring the arm's measured joint angles
+  over ROS2 — or driven by a host-side mock so it runs with no hardware attached.
+  See [`docs/digital-twin.md`](docs/digital-twin.md).
 
 MATLAB scripts in `kinematics/` are used for offline kinematic analysis and trajectory prototyping before porting to the embedded C++ code.
 
@@ -87,11 +90,16 @@ Mini_Ranka/
     │   │   ├── Trajectory/    # Continuous Cartesian waypoint generator
     │   │   └── Telemetry/     # Periodic CSV monitoring over serial
     │   ├── src/
-    │   │   ├── full.cpp       # Main firmware: 3-joint FOC + IK + trajectory
+    │   │   ├── main.cpp       # Main firmware: 3-joint FOC + IK + trajectory
     │   │   ├── tools/
     │   │   │   └── pid_tuner.cpp   # Live PID tuning + step-response over serial
     │   │   └── diagnostics/   # Bring-up sketches (blink, as5600, openloop, …)
     │   └── platformio.ini     # One build env per src target
+    ├── ros2/                  # Host-side ROS2 workspace (pixi + RoboStack)
+    │   └── src/
+    │       ├── full_assembly/          # Raw Onshape CAD export (meshes + URDF)
+    │       ├── mini_ranka_description/ # The robot model the twin drives
+    │       └── mini_ranka_bridge/      # Telemetry, joint states, mock arm
     ├── analysis/             # MATLAB dynamics + Simulink/Simscape models
     ├── Simulations/          # Exported simulation archives
     └── hardware/             # CAD
@@ -100,7 +108,7 @@ Mini_Ranka/
 Each `src/` target has its own PlatformIO environment, e.g.:
 
 ```bash
-pio run -e full -t upload          # main firmware
+pio run -e main -t upload          # main firmware
 pio run -e pid_tuner -t upload     # live PID tuning tool
 pio run -e position -t upload      # single/multi-joint position diagnostic
 ```

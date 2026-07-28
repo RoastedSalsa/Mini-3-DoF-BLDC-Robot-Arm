@@ -340,6 +340,9 @@ static void registerTelemetry() {
   telemetry.add("cmd3", &th3);
   telemetry.add("meas3", &meas3);
   telemetry.add("err3", &err3);
+  telemetry.add("q1", &q1);        // measured angle in the IK JOINT frame [rad]
+  telemetry.add("q2", &q2);        // (meas* are sensor frame: geared + offset)
+  telemetry.add("q3", &q3);        // -> drives the ROS2 twin, see Mark1/ros2
   telemetry.add("mx", &meas_x);   // measured end-effector X (FK of measured angles) [m]
   telemetry.add("my", &meas_y);
   telemetry.add("mz", &meas_z);
@@ -426,11 +429,19 @@ void loop() {
   meas2 = sensor2.getAngle(); err2 = th2 - meas2;
   meas3 = sensor3.getAngle(); err3 = th3 - meas3;
 
+  // Sensor frame -> IK joint frame. Unconditional: q1..q3 are what the ROS2
+  // digital twin drives the model with (joint_state_bridge), and gating them on
+  // the 'C' toggle would leave RViz frozen until someone remembered to press it.
+  // These are also the only place the LIVE home offsets appear on the wire, so
+  // the host never has to keep its own copy of them in sync with config.h.
+  q1 = JOINT_DIR[0] * (meas1 - home_offset[0]) / JOINT_GEAR[0];
+  q2 = JOINT_DIR[1] * (meas2 - home_offset[1]) / JOINT_GEAR[1];   // J2 motor-side -> joint
+  q3 = JOINT_DIR[2] * (meas3 - home_offset[2]) / JOINT_GEAR[2];
+
+  // The Cartesian FK stays behind the toggle — it costs three trig calls per
+  // loop and is only wanted when you are watching the tool position.
   if (cart_meas_enabled) {
-    q1 = JOINT_DIR[0] * (meas1 - home_offset[0]) / JOINT_GEAR[0];
-    q2 = JOINT_DIR[1] * (meas2 - home_offset[1]) / JOINT_GEAR[1];   // J2 motor-side -> joint
-    q3 = JOINT_DIR[2] * (meas3 - home_offset[2]) / JOINT_GEAR[2];
     fk(meas_x, meas_y, meas_z, q1, q2, q3);                // measured end-effector pos
-}
+  }
   telemetry.update(now);
 }

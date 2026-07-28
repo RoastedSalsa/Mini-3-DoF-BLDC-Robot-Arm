@@ -1,0 +1,78 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /RobotModel1
+        - /Tool trace1
+      Splitter Ratio: 0.5
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Cell Size: 0.05
+      Plane Cell Count: 20
+      Enabled: true
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+        Depth: 5
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+      Alpha: 1
+      Visual Enabled: true
+      Collision Enabled: false
+      Enabled: true
+    # Off by default — 20-odd CAD frames is a lot of clutter. Tick it on when
+    # you are checking that a joint spins about the axis you think it does.
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Marker Scale: 0.1
+      Show Axes: true
+      Show Arrows: false
+      Show Names: true
+      Enabled: false
+    # Where the tool actually went. Published by the joint-state source; if you
+    # are running the slider GUI there is nothing on this topic and it stays empty.
+    - Class: rviz_default_plugins/Path
+      Name: Tool trace
+      Topic:
+        Value: /mini_ranka/tool_path
+        Depth: 5
+        Durability Policy: Volatile
+        Reliability Policy: Reliable
+      Color: 255; 170; 0
+      Line Style: Lines
+      Alpha: 1
+      Enabled: true
+  Global Options:
+    # base_link is the firmware's world frame: Z up, +X forward, tool at
+    # (L2+L3, 0, L1) when all joints read zero.
+    Fixed Frame: base_link
+    Background Color: 48; 48; 48
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/FocusCamera
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Current View
+      Distance: 0.9
+      Focal Point:
+        X: 0.15
+        Y: 0
+        Z: 0.08
+      Pitch: 0.35
+      Yaw: 0.6
+      Target Frame: base_link
+Window Geometry:
+  Height: 900
+  Width: 1400
+  Displays:
+    collapsed: false
