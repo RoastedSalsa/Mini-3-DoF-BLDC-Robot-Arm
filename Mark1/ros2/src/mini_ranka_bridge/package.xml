@@ -12,6 +12,9 @@
     into sensor_msgs/JointState so the mini_ranka_description model tracks the
     real arm, and mock_arm supplies the same joint states from a host-side
     replay of the firmware trajectory when no hardware is connected.
+
+    tune, feedback and flow are the operator consoles: commands out, replies in,
+    and a live diagram of which part of that path is actually carrying data.
   </description>
   <maintainer email="augustasger@gmail.com">RoastedSalsa</maintainer>
   <license>MIT</license>
@@ -21,8 +24,12 @@
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>rcl_interfaces</exec_depend>
+  <exec_depend>tf2_msgs</exec_depend>
   <exec_depend>python3-serial</exec_depend>
   <exec_depend>ros2launch</exec_depend>
+  <!-- flow only; resolves to the same PyQt the rqt stack already uses. -->
+  <exec_depend>python_qt_binding</exec_depend>
   <!-- twin.launch.py composes this package with the robot model. -->
   <exec_depend>mini_ranka_description</exec_depend>
 

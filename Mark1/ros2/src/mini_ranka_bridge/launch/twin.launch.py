@@ -40,6 +40,17 @@ def generate_launch_description() -> LaunchDescription:
         ),
         DeclareLaunchArgument("namespace", default_value="mini_ranka"),
         DeclareLaunchArgument("rviz", default_value="true"),
+        # Same file display.launch.py would have picked, spelled out here so the
+        # session launcher can swap in the bare-viewport config instead.
+        DeclareLaunchArgument(
+            "rviz_config",
+            default_value=PathJoinSubstitution([
+                FindPackageShare("mini_ranka_description"),
+                "rviz", "mini_ranka.rviz",
+            ]),
+            description="RViz config to open. session.rviz drops the side docks "
+                        "and leaves only the 3D view.",
+        ),
         # --- live only ---
         DeclareLaunchArgument("port", default_value="/dev/ttyACM0"),
         DeclareLaunchArgument("baud", default_value="921600"),
@@ -61,6 +72,7 @@ def generate_launch_description() -> LaunchDescription:
         launch_arguments={
             "jsp": "none",
             "rviz": LaunchConfiguration("rviz"),
+            "rviz_config": LaunchConfiguration("rviz_config"),
         }.items(),
     )
 

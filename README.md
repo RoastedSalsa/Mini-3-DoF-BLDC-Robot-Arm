@@ -99,7 +99,8 @@ Mini_Ranka/
     │   └── src/
     │       ├── full_assembly/          # Raw Onshape CAD export (meshes + URDF)
     │       ├── mini_ranka_description/ # The robot model the twin drives
-    │       └── mini_ranka_bridge/      # Telemetry, joint states, mock arm
+    │       └── mini_ranka_bridge/      # Telemetry, joint states, mock arm, consoles
+    ├── tools/                # Hyprland session launcher (see tools/README.md)
     ├── analysis/             # MATLAB dynamics + Simulink/Simscape models
     ├── Simulations/          # Exported simulation archives
     └── hardware/             # CAD

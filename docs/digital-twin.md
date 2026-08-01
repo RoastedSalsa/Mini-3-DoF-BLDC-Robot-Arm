@@ -27,6 +27,10 @@ pixi run -e lyrical build
 pixi shell -e lyrical          # or: source install/setup.bash
 ```
 
+To bring the twin up alongside the consoles and PlotJuggler on two Hyprland
+workspaces in one keypress instead, see
+[desktop-session.md](desktop-session.md).
+
 **No hardware** — replays the `config.h` trajectory through the host-side IK:
 
 ```bash

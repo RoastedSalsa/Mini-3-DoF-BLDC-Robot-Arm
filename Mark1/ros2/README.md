@@ -1,12 +1,14 @@
 # Mini_Ranka ROS2 workspace
 
-Host-side ROS2 packages for the arm. Currently one package:
+Host-side ROS2 packages for the arm:
 
 - **`mini_ranka_bridge`** — bidirectional serial bridge: republishes the
   firmware's JSON telemetry as `std_msgs/Float64` topics for PlotJuggler, and
   forwards `std_msgs/String` commands from `/<ns>/cmd` to the firmware's SimpleFOC
-  Commander (non-JSON replies are echoed on `/<ns>/log`). Ships a `tune` console
-  for interactive live PID tuning.
+  Commander (non-JSON replies are echoed on `/<ns>/log`). Also ships the operator
+  consoles (`tune`, `feedback`, `flow`) and the `mock_arm` joint source.
+- **`mini_ranka_description`** — the robot model the twin drives.
+- **`full_assembly`** — raw Onshape CAD export; supplies the meshes.
 
 This is a normal colcon workspace (`src/` here, `build/ install/ log/` are
 git-ignored). It is decoupled from the firmware by a plain
@@ -17,8 +19,8 @@ know ROS2 exists, and the bridge doesn't know the arm's schema.
 
 ```bash
 cd Mark1/ros2
-colcon build
-source install/setup.bash
+pixi run -e lyrical build     # -e lyrical is required; the default env has no ROS
+pixi shell -e lyrical         # or: source install/setup.bash
 ```
 
 ## Run
@@ -64,3 +66,24 @@ ros2 topic echo /mini_ranka/log
 
 Don't also open `pio device monitor` on the same port — the bridge owns it.
 Procedure: [docs/tuning-guide.md](../../docs/tuning-guide.md).
+
+## Consoles
+
+`tune` publishes to `/<ns>/cmd`; two read-only companions make a session legible:
+
+```bash
+# commands you sent and the firmware's replies, interleaved in one stream,
+# with bridge-level events from /rosout folded in
+ros2 run mini_ranka_bridge feedback
+
+# live diagram of the whole path, firmware -> serial -> topics -> RViz,
+# with each box lit by measured data rate rather than by "the process exists"
+ros2 run mini_ranka_bridge flow
+```
+
+`flow` is passive — it never writes to `/<ns>/cmd`. Press `d` to send a bare `D`,
+the one Commander command that reports the dynamics terms without toggling them
+(`DG`/`DI`/`DC`/`DK` are XOR toggles).
+
+All of the above, plus RViz and PlotJuggler, come up on two Hyprland workspaces
+with `Mark1/tools/mini-ranka-session` — see [tools/README.md](../tools/README.md).

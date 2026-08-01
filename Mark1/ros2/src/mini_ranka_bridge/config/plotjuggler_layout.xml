@@ -1,0 +1,116 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--
+  PlotJuggler layout for the Mini_Ranka arm: the four plots you almost always
+  end up building by hand.  Mark1/tools/mini-ranka-session loads it with the
+  nosplash and layout flags, and adds the start_streamer flag in live mode.
+
+  Careful when editing this header: XML forbids a double hyphen anywhere inside
+  a comment, so command lines with long options cannot be written out here.
+  PlotJuggler reports that as "Parse error at line N" and silently starts with
+  no layout at all.
+
+  Curve names are the ROS2 parser's flattening of std_msgs/Float64, i.e. the
+  topic plus /data.  Those topics only exist while telemetry_bridge is running
+  against real hardware; in mock mode nothing publishes them and the plots stay
+  empty, which is correct rather than broken.
+
+  Signal set assumes the `main` firmware.  The pid_tuner build publishes
+  target/meas/err/vel instead and none of these curves will resolve; build a
+  layout for that separately if you start tuning often.
+
+  This file is only a starting point and the launcher treats it as optional.
+  Rearranged it in the GUI?  File > Save Layout straight back over this path and
+  the next session picks it up.
+-->
+<root>
+  <tabbed_widget parent="main_window" name="Main Window">
+    <Tab containers="1" tab_name="mini_ranka">
+      <Container>
+        <DockSplitter count="2" sizes="0.5;0.5" orientation="|">
+          <DockSplitter count="2" sizes="0.5;0.5" orientation="-">
+
+            <!-- Tracking error: the first thing to look at after a gain change. -->
+            <DockArea name="tracking error [rad]">
+              <plot flip_y="false" flip_x="false" mode="TimeSeries" style="Lines">
+                <range bottom="-0.25" top="0.25" left="0" right="10"/>
+                <limitY/>
+                <curve name="/mini_ranka/err1/data" color="#1f77b4"/>
+                <curve name="/mini_ranka/err2/data" color="#d62728"/>
+                <curve name="/mini_ranka/err3/data" color="#2ca02c"/>
+              </plot>
+            </DockArea>
+
+            <!-- IK-frame joint angles: what the twin in RViz is being driven by. -->
+            <DockArea name="joint angles q1..q3 [rad]">
+              <plot flip_y="false" flip_x="false" mode="TimeSeries" style="Lines">
+                <range bottom="-2.2" top="2.2" left="0" right="10"/>
+                <limitY/>
+                <curve name="/mini_ranka/q1/data" color="#1f77b4"/>
+                <curve name="/mini_ranka/q2/data" color="#d62728"/>
+                <curve name="/mini_ranka/q3/data" color="#2ca02c"/>
+              </plot>
+            </DockArea>
+
+          </DockSplitter>
+          <DockSplitter count="2" sizes="0.5;0.5" orientation="-">
+
+            <!-- Motor frame, command against measurement.  Pale = measured, so a
+                 lagging joint shows as its pale twin trailing the saturated one. -->
+            <DockArea name="commanded vs measured [rad, motor frame]">
+              <plot flip_y="false" flip_x="false" mode="TimeSeries" style="Lines">
+                <range bottom="-8" top="8" left="0" right="10"/>
+                <limitY/>
+                <curve name="/mini_ranka/cmd1/data" color="#1f77b4"/>
+                <curve name="/mini_ranka/meas1/data" color="#7fb3d5"/>
+                <curve name="/mini_ranka/cmd2/data" color="#d62728"/>
+                <curve name="/mini_ranka/meas2/data" color="#e88b8b"/>
+                <curve name="/mini_ranka/cmd3/data" color="#2ca02c"/>
+                <curve name="/mini_ranka/meas3/data" color="#86c98a"/>
+              </plot>
+            </DockArea>
+
+            <!-- Cartesian target against FK of the measured angles.  mx/my/mz sit
+                 at zero until the C command turns cartesian measurement on. -->
+            <DockArea name="cartesian target vs measured [m]">
+              <plot flip_y="false" flip_x="false" mode="TimeSeries" style="Lines">
+                <range bottom="-0.3" top="0.4" left="0" right="10"/>
+                <limitY/>
+                <curve name="/mini_ranka/x/data" color="#1f77b4"/>
+                <curve name="/mini_ranka/mx/data" color="#7fb3d5"/>
+                <curve name="/mini_ranka/y/data" color="#d62728"/>
+                <curve name="/mini_ranka/my/data" color="#e88b8b"/>
+                <curve name="/mini_ranka/z/data" color="#2ca02c"/>
+                <curve name="/mini_ranka/mz/data" color="#86c98a"/>
+              </plot>
+            </DockArea>
+
+          </DockSplitter>
+        </DockSplitter>
+      </Container>
+    </Tab>
+    <currentTabIndex index="0"/>
+  </tabbed_widget>
+
+  <use_relative_time_offset enabled="1"/>
+
+  <Plugins>
+    <plugin ID="ROS2 Topic Subscriber">
+      <!-- The firmware's own `t` is a plain channel, not a header stamp, so time
+           has to come from ROS receive time. -->
+      <use_header_stamp value="false"/>
+      <discard_large_arrays value="true"/>
+      <max_array_size value="100"/>
+      <boolean_strings_to_number value="true"/>
+      <remove_suffix_from_strings value="true"/>
+      <selected_topics value="/mini_ranka/t;/mini_ranka/x;/mini_ranka/y;/mini_ranka/z;/mini_ranka/cmd1;/mini_ranka/meas1;/mini_ranka/err1;/mini_ranka/cmd2;/mini_ranka/meas2;/mini_ranka/err2;/mini_ranka/cmd3;/mini_ranka/meas3;/mini_ranka/err3;/mini_ranka/q1;/mini_ranka/q2;/mini_ranka/q3;/mini_ranka/mx;/mini_ranka/my;/mini_ranka/mz;/mini_ranka/ff1;/mini_ranka/ff2;/mini_ranka/ff3"/>
+    </plugin>
+  </Plugins>
+
+  <previouslyLoaded_Datafiles/>
+  <!-- Deliberately no previouslyLoaded_Streamer element. With one present
+       PlotJuggler opens a modal "Start Streaming?" prompt on every load, even
+       in mock mode where there is nothing to subscribe to. Whether to stream is
+       the launcher's call, made with the start_streamer flag. -->
+  <customMathEquations/>
+  <snippets/>
+</root>

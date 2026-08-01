@@ -1,0 +1,404 @@
+#!/usr/bin/env bash
+# Bring the whole arm workspace up as one Hyprland session.
+#
+#   workspace 6 (big screen)    RViz filling the workspace, three floating
+#                               consoles on top: commands out, MCU replies in,
+#                               and the live flow panel top-right
+#   workspace 7 (small screen)  PlotJuggler, already streaming in live mode
+#
+# Started from hyprland.conf's exec-once and bound to SUPER+A; see
+# Mark1/tools/hypr/mini-ranka.conf for the window rules that go with it.
+#
+#   mini-ranka-session [start]        auto-detect: live if a board is plugged in
+#   mini-ranka-session start --mock   host-side replay, never touches serial
+#   mini-ranka-session start --live [--port /dev/ttyACM1]
+#   mini-ranka-session stop | restart | status
+#
+# Window geometry is derived from `hyprctl monitors -j` every run rather than
+# hardcoded: hyprland.conf asks HDMI-A-1 for 2560x1440 but the panel only does
+# 1920x1080, so the compositor silently falls back and any baked-in numbers
+# would be wrong. The dock also gets unplugged, so a missing monitor falls back
+# to whatever is actually connected instead of failing.
+
+set -uo pipefail
+
+SELF="$(readlink -f "$0")"
+TOOLS="$(dirname "$SELF")"
+REPO="$(dirname "$(dirname "$TOOLS")")"
+WSDIR="$REPO/Mark1/ros2"
+PIXI_ENV="lyrical"
+
+RUNTIME="${XDG_RUNTIME_DIR:-/tmp}/mini-ranka"
+ENV_SH="$RUNTIME/env.sh"
+PIDFILE="$RUNTIME/pids"
+LOGDIR="$TOOLS/logs"
+
+BIG_MON="${MINI_RANKA_BIG_MONITOR:-HDMI-A-1}"
+SMALL_MON="${MINI_RANKA_SMALL_MONITOR:-eDP-1}"
+WS_MAIN="${MINI_RANKA_WS_MAIN:-6}"
+WS_PLOT="${MINI_RANKA_WS_PLOT:-7}"
+GAP=12
+
+# Console look. background_opacity fades ONLY the terminal background — glyphs
+# stay fully opaque — which is why the compositor-side opacity is pinned to 1.0
+# in hypr/mini-ranka.conf instead. Raise this if the consoles are too faint over
+# a bright part of the RViz scene.
+CONSOLE_OPACITY="${MINI_RANKA_CONSOLE_OPACITY:-0.10}"
+KITTY_LOOK=(
+  -o confirm_os_window_close=0
+  -o "background_opacity=$CONSOLE_OPACITY"
+  -o dynamic_background_opacity=yes
+  -o background=#080c10
+  -o cursor=#eaf4f8
+  -o window_padding_width=8
+)
+
+RVIZ_CFG="$WSDIR/install/mini_ranka_description/share/mini_ranka_description/rviz/session.rviz"
+PJ_LAYOUT="$WSDIR/install/mini_ranka_bridge/share/mini_ranka_bridge/config/plotjuggler_layout.xml"
+PJ_STREAMER="ROS2 Topic Subscriber"
+
+# Confirmed with `hyprctl clients -j`: both are Qt apps running through XWayland.
+RE_RVIZ='^rviz2?$|^RViz'
+RE_PJ='plotjuggler'
+
+PY=/usr/bin/python3
+command -v "$PY" >/dev/null 2>&1 || PY=python3
+
+say()  { printf '%s\n' "$*" >&2; }
+warn() { printf '!! %s\n' "$*" >&2; }
+die() {
+  warn "$*"
+  command -v notify-send >/dev/null 2>&1 &&
+    notify-send -u critical "mini_ranka session" "$*"
+  exit 1
+}
+
+# --- environment -----------------------------------------------------------
+
+ensure_env() {
+  mkdir -p "$RUNTIME" "$LOGDIR"
+  [[ -d "$WSDIR" ]] || die "no ROS2 workspace at $WSDIR"
+  [[ -f "$WSDIR/install/setup.bash" ]] ||
+    die "workspace not built — run: cd $WSDIR && pixi run -e $PIXI_ENV build"
+
+  # pixi shell-hook costs ~2 s, so cache it and only redo it when the lockfile
+  # or the colcon overlay moved underneath us. Its activation script sources
+  # install/setup.bash, so this one file is the whole environment.
+  if [[ ! -s "$ENV_SH" ]] ||
+     [[ "$WSDIR/pixi.lock" -nt "$ENV_SH" ]] ||
+     [[ "$WSDIR/install/setup.bash" -nt "$ENV_SH" ]]; then
+    say "regenerating $ENV_SH"
+    (cd "$WSDIR" && pixi shell-hook -e "$PIXI_ENV") > "$ENV_SH.tmp" 2>"$RUNTIME/shell-hook.err" ||
+      die "pixi shell-hook -e $PIXI_ENV failed; see $RUNTIME/shell-hook.err"
+    mv "$ENV_SH.tmp" "$ENV_SH"
+  fi
+}
+
+# Console runner: keeps the window alive after the node exits, still inside the
+# ROS environment, so a crash leaves you somewhere useful instead of closing.
+write_console_runner() {
+  local name=$1 cmd=$2 f="$RUNTIME/run-$1.sh"
+  {
+    echo '#!/usr/bin/env bash'
+    printf 'source %q\ncd %q\n' "$ENV_SH" "$WSDIR"
+    printf '%s\n' "$cmd"
+    printf 'printf "\\n\\033[38;2;120;120;120m[%s exited — shell is still inside the ROS env]\\033[0m\\n"\n' "$name"
+    echo 'exec bash'
+  } > "$f"
+  chmod +x "$f"
+  printf '%s' "$f"
+}
+
+write_bg_runner() {
+  local name=$1 cmd=$2 f="$RUNTIME/run-$1.sh"
+  {
+    echo '#!/usr/bin/env bash'
+    printf 'source %q\ncd %q\nexec %s\n' "$ENV_SH" "$WSDIR" "$cmd"
+  } > "$f"
+  chmod +x "$f"
+  printf '%s' "$f"
+}
+
+# --- hyprland --------------------------------------------------------------
+
+wait_for_hyprland() {
+  [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] || die "not inside a Hyprland session"
+  local n=0
+  # exec-once can fire before the outputs are configured.
+  until [[ "$(hyprctl monitors -j 2>/dev/null | tr -d '[:space:]')" != "[]" ]]; do
+    (( n++ > 60 )) && die "no monitors after 15 s"
+    sleep 0.25
+  done
+}
+
+# The helpers below shell out to hyprctl from inside Python rather than being
+# piped into: the script itself arrives on stdin via heredoc, so a pipe would
+# be swallowed.
+hypr_json='
+import json, subprocess
+def hypr(*args):
+    out = subprocess.run(["hyprctl", *args, "-j"], capture_output=True, text=True)
+    return json.loads(out.stdout or "[]")
+'
+
+# Prints: name x y w h  — the usable rect of a monitor, in global coordinates,
+# with the waybar reservation already taken off.
+usable_rect() {
+  "$PY" -c "$hypr_json"'
+import sys
+mons = hypr("monitors")
+if not mons:
+    sys.exit(1)
+want = sys.argv[1]
+m = next((m for m in mons if m["name"] == want), None)
+if m is None:
+    # Prefer the biggest external panel; the dock is regularly unplugged and a
+    # single-monitor session should still lay out sensibly.
+    external = [x for x in mons if not x["name"].startswith("eDP")]
+    m = max(external or mons, key=lambda x: x["width"] * x["height"])
+left, top, right, bottom = m["reserved"]      # left, top, right, bottom
+scale = m.get("scale") or 1.0
+w = round(m["width"] / scale)
+h = round(m["height"] / scale)
+print(m["name"], m["x"] + left, m["y"] + top, w - left - right, h - top - bottom)
+' "$1"
+}
+
+# Prints: address workspace_id  for the best window matching a regex over
+# class / initialClass / title / initialTitle. Pass a second argument to accept
+# only tiled windows — PlotJuggler throws up modal dialogs that carry the same
+# class as its main window, and matching one of those instead is how the real
+# window ends up unplaced.
+find_window() {
+  "$PY" -c "$hypr_json"'
+import re, sys
+pat = re.compile(sys.argv[1], re.I)
+tiled_only = len(sys.argv) > 2 and sys.argv[2] == "tiled"
+hits = [c for c in hypr("clients")
+        if any(pat.search(c.get(f) or "")
+               for f in ("class", "initialClass", "title", "initialTitle"))]
+if tiled_only:
+    hits = [c for c in hits if not c["floating"]]
+if not hits:
+    sys.exit(1)
+best = max(hits, key=lambda c: c["size"][0] * c["size"][1])
+print(best["address"], best["workspace"]["id"])
+' "$1" "${2:-}"
+}
+
+await_window() {   # regex [timeout_s] [tiled] -> "address workspace"
+  local deadline=$(( SECONDS + ${2:-25} )) hit
+  while (( SECONDS < deadline )); do
+    if hit=$(find_window "$1" "${3:-}"); then printf '%s' "$hit"; return 0; fi
+    sleep 0.3
+  done
+  return 1
+}
+
+# Phase two of placement. The window rules in hypr/mini-ranka.conf already float
+# these and put them on the right workspace; this pins the exact rect, which a
+# rule cannot express in terms of the live monitor size.
+place_floating() {   # regex x y w h
+  local hit addr
+  hit=$(await_window "$1") || { warn "no window matched /$1/ — not placed"; return 1; }
+  addr=${hit%% *}
+  hyprctl --batch "\
+dispatch setfloating address:$addr ; \
+dispatch resizewindowpixel exact $4 $5,address:$addr ; \
+dispatch movewindowpixel exact $2 $3,address:$addr" >/dev/null
+}
+
+# RViz and PlotJuggler stay tiled: a lone tiled window fills its workspace, and
+# Hyprland draws floating windows above tiled ones, which is exactly the
+# "RViz in the background" arrangement.
+park_tiled() {   # regex workspace [timeout]
+  local hit addr ws
+  hit=$(await_window "$1" "${3:-45}" tiled) ||
+    { warn "no window matched /$1/"; return 1; }
+  addr=${hit%% *}; ws=${hit##* }
+  [[ "$ws" == "$2" ]] ||
+    hyprctl dispatch movetoworkspacesilent "$2,address:$addr" >/dev/null
+}
+
+# --- lifecycle -------------------------------------------------------------
+
+running_pids() {
+  [[ -f "$PIDFILE" ]] || return 0
+  local name pid
+  while read -r name pid; do
+    [[ -n "${pid:-}" ]] && kill -0 "$pid" 2>/dev/null && printf '%s %s\n' "$name" "$pid"
+  done < "$PIDFILE"
+}
+
+spawn() {   # name command...
+  local name=$1; shift
+  setsid "$@" > "$LOGDIR/$name.log" 2>&1 &
+  printf '%s %s\n' "$name" "$!" >> "$PIDFILE"
+}
+
+do_start() {
+  local source="" port="/dev/ttyACM0"
+  while (( $# )); do
+    case "$1" in
+      --mock) source=mock ;;
+      --live) source=live ;;
+      --port) port="$2"; shift ;;
+      *) die "unknown option: $1" ;;
+    esac
+    shift
+  done
+
+  wait_for_hyprland
+
+  if [[ -n "$(running_pids)" ]]; then
+    say "session already up — focusing workspace $WS_MAIN"
+    hyprctl dispatch workspace "$WS_MAIN" >/dev/null
+    exit 0
+  fi
+
+  ensure_env
+  : > "$PIDFILE"
+
+  # twin.launch.py picks one source at launch and cannot switch later, so the
+  # decision is made here from whether a board is actually present.
+  if [[ -z "$source" ]]; then
+    local found
+    found=$(compgen -G "/dev/ttyACM*" || true)
+    if [[ -n "$found" ]]; then
+      source=live
+      port=$(printf '%s\n' "$found" | head -1)
+    else
+      source=mock
+    fi
+  fi
+  if [[ "$source" == live ]]; then say "source: live ($port)"; else say "source: mock"; fi
+
+  # RViz is started separately rather than by twin.launch.py, for two reasons:
+  # it needs --fullscreen (which is what actually strips the menu bar, toolbar
+  # and docks — session.rviz's Hide Left/Right Dock keys are ignored by rviz2
+  # 15.2.3), and launching it here gives it its own pid so `stop` can kill it
+  # instead of chasing a grandchild of ros2 launch.
+  local -a twin_args=(source:="$source" rviz:=false)
+  [[ "$source" == live ]] && twin_args+=(port:="$port")
+
+  spawn twin bash "$(write_bg_runner twin \
+    "ros2 launch mini_ranka_bridge twin.launch.py ${twin_args[*]}")"
+
+  local rviz_cmd="rviz2 --fullscreen"
+  [[ -f "$RVIZ_CFG" ]] && rviz_cmd+=" -d $(printf '%q' "$RVIZ_CFG")"
+  spawn rviz bash "$(write_bg_runner rviz "$rviz_cmd")"
+
+  # Layout and streamer are live-only. The layout plots <ns>/* and nothing
+  # publishes those in mock, so loading it there earns a modal "can't find one
+  # or more curves" on every start; auto-streaming earns an empty topic picker.
+  # In mock, PlotJuggler comes up clean and you can stream /joint_states if you
+  # want to look at the twin. The layout is optional by design either way:
+  # overwrite it from File > Save Layout and the next session picks it up.
+  local pj_cmd="ros2 run plotjuggler plotjuggler -n"
+  if [[ "$source" == live ]]; then
+    [[ -f "$PJ_LAYOUT" ]] && pj_cmd+=" --layout $(printf '%q' "$PJ_LAYOUT")"
+    pj_cmd+=" --start_streamer $(printf '%q' "$PJ_STREAMER")"
+  fi
+  spawn plotjuggler bash "$(write_bg_runner plotjuggler "$pj_cmd")"
+
+  spawn inputs kitty --class mini-ranka-inputs --title "mini_ranka · inputs" \
+    "${KITTY_LOOK[@]}" \
+    bash "$(write_console_runner inputs "ros2 run mini_ranka_bridge tune")"
+  spawn feedback kitty --class mini-ranka-feedback --title "mini_ranka · feedback" \
+    "${KITTY_LOOK[@]}" \
+    bash "$(write_console_runner feedback "ros2 run mini_ranka_bridge feedback")"
+  # No terminal for the flow panel: it opens its own Qt window, so hosting it in
+  # a kitty would leave an empty terminal sitting behind it.
+  spawn flow bash "$(write_bg_runner flow "ros2 run mini_ranka_bridge flow")"
+
+  # --- geometry ---
+  local mon mx my mw mh
+  read -r mon mx my mw mh <<<"$(usable_rect "$BIG_MON")" ||
+    die "could not read monitor geometry"
+  [[ "$mon" == "$BIG_MON" ]] ||
+    say "$BIG_MON not connected — laying out on $mon instead"
+
+  local col_w=$(( mw * 34 / 100 ))
+  local flow_w=$(( mw * 36 / 100 ))
+  local flow_h=$(( mh * 62 / 100 ))
+  local half=$(( (mh - 3 * GAP) / 2 ))
+
+  place_floating '^mini-ranka-inputs$' \
+    $(( mx + GAP )) $(( my + GAP )) "$col_w" "$half"
+  place_floating '^mini-ranka-feedback$' \
+    $(( mx + GAP )) $(( my + GAP + half + GAP )) "$col_w" \
+    $(( mh - 3 * GAP - half ))
+  place_floating '^mini-ranka-flow$' \
+    $(( mx + mw - flow_w - GAP )) $(( my + GAP )) "$flow_w" "$flow_h"
+
+  park_tiled "$RE_RVIZ" "$WS_MAIN"
+  park_tiled "$RE_PJ" "$WS_PLOT"
+
+  say "up on workspaces $WS_MAIN ($mon) and $WS_PLOT — logs in $LOGDIR"
+}
+
+do_stop() {
+  local name pid
+  if [[ -f "$PIDFILE" ]]; then
+    while read -r name pid; do
+      [[ -n "${pid:-}" ]] || continue
+      kill -TERM "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null
+    done < "$PIDFILE"
+    sleep 1.5
+    while read -r name pid; do
+      [[ -n "${pid:-}" ]] || continue
+      kill -KILL "-$pid" 2>/dev/null
+    done < "$PIDFILE"
+    rm -f "$PIDFILE"
+  fi
+
+  # rviz2 is a grandchild of ros2 launch and occasionally outlives the group.
+  local addr
+  for addr in $("$PY" -c "$hypr_json"'
+import re, sys
+keep = {int(sys.argv[1]), int(sys.argv[2])}
+pat = re.compile(r"mini-ranka-|rviz|plotjuggler", re.I)
+for c in hypr("clients"):
+    if c["workspace"]["id"] in keep and pat.search(
+            (c.get("class") or "") + " " + (c.get("title") or "")):
+        print(c["address"])
+' "$WS_MAIN" "$WS_PLOT"); do
+    hyprctl dispatch closewindow "address:$addr" >/dev/null
+  done
+  say "session stopped"
+}
+
+do_status() {
+  local alive
+  alive=$(running_pids)
+  if [[ -z "$alive" ]]; then
+    say "session: not running"
+  else
+    say "session: running"
+    printf '%s\n' "$alive" | while read -r name pid; do
+      printf '  %-12s pid %s\n' "$name" "$pid" >&2
+    done
+  fi
+  "$PY" -c "$hypr_json"'
+import sys
+keep = {int(sys.argv[1]), int(sys.argv[2])}
+rows = [c for c in hypr("clients") if c["workspace"]["id"] in keep]
+if rows:
+    print("windows:", file=sys.stderr)
+for c in sorted(rows, key=lambda c: (c["workspace"]["id"], c["class"])):
+    print("  ws%-3s %-28s %4dx%-4d at %4d,%-4d %s"
+          % (c["workspace"]["id"], c["class"], c["size"][0], c["size"][1],
+             c["at"][0], c["at"][1], "float" if c["floating"] else "tiled"),
+          file=sys.stderr)
+' "$WS_MAIN" "$WS_PLOT"
+}
+
+case "${1:-start}" in
+  start)   shift || true; do_start "$@" ;;
+  stop)    do_stop ;;
+  restart) do_stop; sleep 1; shift || true; do_start "$@" ;;
+  status)  do_status ;;
+  -h|--help|help)
+    sed -n '2,25p' "$SELF" | sed 's/^# \{0,1\}//' >&2 ;;
+  *) die "usage: $(basename "$0") [start [--mock|--live] [--port DEV]|stop|restart|status]" ;;
+esac

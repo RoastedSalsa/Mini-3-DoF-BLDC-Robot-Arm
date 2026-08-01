@@ -1,0 +1,107 @@
+# mini_ranka.rviz reframed for the Hyprland session, where RViz is a
+# full-workspace tiled window sitting *behind* three floating consoles. Those
+# cover the left third, so the camera is pulled back and swung right to keep the
+# arm in the open middle of the workspace, and the background is dropped to
+# match the flow panel.
+#
+# What this file does NOT do is remove the chrome. The Hide Left Dock / Hide
+# Right Dock keys below are the documented way to do it and rviz2 15.2.3 ignores
+# them; they are kept because they cost nothing if that is ever fixed. What
+# actually strips the menu bar, toolbar and docks is starting RViz with
+# --fullscreen, which mini-ranka-session does, paired with a Hyprland
+# `fullscreen_state = 0 2` rule so the window still tiles instead of covering
+# waybar and the consoles. Loading this config on its own gives you the normal
+# RViz window with a nicer camera.
+#
+# Displays are identical to mini_ranka.rviz — edit that file first, then mirror
+# the change here.
+#
+#     ros2 launch mini_ranka_bridge twin.launch.py            # mini_ranka.rviz
+#     ros2 launch mini_ranka_bridge twin.launch.py rviz_config:=<this file>
+#     rviz2 --fullscreen -d <this file>                       # what the session runs
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /RobotModel1
+        - /Tool trace1
+      Splitter Ratio: 0.5
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Cell Size: 0.05
+      Plane Cell Count: 20
+      Enabled: true
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+        Depth: 5
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+      Alpha: 1
+      Visual Enabled: true
+      Collision Enabled: false
+      Enabled: true
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Marker Scale: 0.1
+      Show Axes: true
+      Show Arrows: false
+      Show Names: true
+      Enabled: false
+    - Class: rviz_default_plugins/Path
+      Name: Tool trace
+      Topic:
+        Value: /mini_ranka/tool_path
+        Depth: 5
+        Durability Policy: Volatile
+        Reliability Policy: Reliable
+      Color: 255; 170; 0
+      Line Style: Lines
+      Alpha: 1
+      Enabled: true
+  Global Options:
+    Fixed Frame: base_link
+    # Darker than mini_ranka.rviz's 48/48/48 to match the flow panel's #101012,
+    # so the workspace reads as one surface with the consoles floating over it.
+    Background Color: 16; 16; 18
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/FocusCamera
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Current View
+      # Pulled back and shifted right of mini_ranka.rviz's framing: the arm sits
+      # in the open middle of the workspace rather than behind the consoles.
+      Distance: 1.1
+      Focal Point:
+        X: 0.16
+        Y: -0.06
+        Z: 0.10
+      Pitch: 0.32
+      Yaw: 0.75
+      Target Frame: base_link
+Window Geometry:
+  Height: 1052
+  Width: 1920
+  Hide Left Dock: true
+  Hide Right Dock: true
+  Displays:
+    collapsed: true
+  Views:
+    collapsed: true
+  Selection:
+    collapsed: true
+  Tool Properties:
+    collapsed: true
+  Time:
+    collapsed: true
